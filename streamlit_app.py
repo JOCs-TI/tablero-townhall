@@ -1,0 +1,503 @@
+import openpyxl
+import pandas as pd
+import plotly.graph_objects as go
+import streamlit as st
+from pathlib import Path
+
+st.set_page_config(
+    page_title="Town Hall 2026",
+    page_icon=None,
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# Rutas relativas al propio archivo: funcionan igual en Windows y en Linux (la nube).
+BASE = Path(__file__).parent
+EXCEL_PATH = BASE / "EXCEL" / "Town Hall Julio 2026.xlsx"
+LOGO_PATH = BASE / "imagenes" / "logo2.png"
+
+MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
+         "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+
+COLORES = {
+    "BENEFICIOS":    "#1f77b4",
+    "LF":            "#d62728",
+    "DAÑOS":         "#2ca02c",
+    "FIANZAS":       "#ff7f0e",
+    "LP":            "#8c564b",
+    "AUTOS":         "#9467bd",
+    "BONO":          "#17becf",
+    "ANI":           "#e377c2",
+    "AFFINITY":      "#7f7f7f",
+    "HONORARIOS":    "#bcbd22",
+    "INTERNACIONAL": "#aec7e8",
+}
+# Cuatro hues bien separados y visibles sobre fondo oscuro: gris (histórico 2024),
+# verde (2025), ámbar (meta/PTO) y azul brillante (real 2026, la línea protagonista).
+COLOR_2024 = "#9aa0a6"   # gris medio · dotted
+COLOR_2025 = "#51cf66"   # verde claro · dashed
+COLOR_PTO  = "#ffd166"   # ámbar · dashdot (línea de meta)
+COLOR_2026 = "#4dabf7"   # azul brillante · sólido (protagonista)
+C_NEG = "#ff6b6b"
+C_POS = "#51cf66"
+
+# ── Helpers ────────────────────────────────────────────────────────────────────
+def fmt(v):
+    if v is None or (isinstance(v, float) and pd.isna(v)):
+        return "—"
+    return f"${v:,.0f}"
+
+def fmt_m(v):
+    if v is None or (isinstance(v, float) and pd.isna(v)):
+        return "—"
+    a = abs(v)
+    if a >= 1e6:
+        return f"${v/1e6:,.1f}M"
+    if a >= 1e3:
+        return f"${v/1e3:,.0f}k"
+    return f"${v:,.0f}"
+
+def pct(v):
+    if v is None or (isinstance(v, float) and pd.isna(v)):
+        return "—"
+    return f"{'+' if v >= 0 else ''}{v*100:.1f}%"
+
+def sf(v):
+    return float(v) if isinstance(v, (int, float)) else 0.0
+
+def norm(s):
+    if not isinstance(s, str):
+        return s
+    return (s.replace("DA�OS", "DAÑOS").replace("DANOS", "DAÑOS")
+             .replace("�REA", "AREA").replace("�", "Ñ").strip())
+
+# ── Carga ──────────────────────────────────────────────────────────────────────
+@st.cache_data(show_spinner="Cargando datos...")
+def load_data():
+    """Lee los bloques por año buscando los encabezados 'AREA', no filas fijas."""
+    wb = openpyxl.load_workbook(EXCEL_PATH, data_only=True)
+
+    def etiqueta(txt):
+        s = str(txt).upper()
+        if "PTO" in s or "PRESUP" in s:
+            return "PTO"
+        for y in ("2026", "2025", "2024"):
+            if y in s:
+                return y
+        return None
+
+    def leer_hoja(nombre):
+        ws = wb[nombre]
+        rows = list(ws.iter_rows(min_row=1, values_only=True))
+        bloques = {}
+        for i, r in enumerate(rows):
+            if not r or r[0] is None:
+                continue
+            if norm(str(r[0])).upper() not in ("AREA", "ÁREA"):
+                continue
+            # la etiqueta del bloque vive en la fila anterior
+            lab = None
+            for back in (1, 2):
+                if i - back >= 0 and rows[i - back] and rows[i - back][0] is not None:
+                    lab = etiqueta(rows[i - back][0])
+                    if lab:
+                        break
+            if not lab:
+                continue
+            datos = {}
+            for r2 in rows[i + 1:]:
+                if not r2 or r2[0] is None or not str(r2[0]).strip():
+                    continue
+                a = norm(str(r2[0])).upper()
+                if a == "TOTAL":
+                    break
+                datos[a] = [sf(r2[c]) for c in range(1, 13)]
+            if datos:
+                bloques[lab] = datos
+        return bloques
+
+    ing = leer_hoja("Ingresos")
+    vn = leer_hoja("VN")
+    return ing, vn
+
+try:
+    ING, VN = load_data()
+except Exception as e:
+    st.error(f"Error al abrir el archivo: {e}")
+    st.stop()
+
+if not ING:
+    st.error(f"No se encontraron bloques de datos en el archivo:\n\n`{EXCEL_PATH}`")
+    st.stop()
+
+# Áreas excluidas de todo el tablero.
+EXCLUIR_AREAS = {"INTERNACIONAL"}
+for _grupo in (ING, VN):
+    for _bloque in _grupo.values():
+        for _a in list(_bloque):
+            if _a in EXCLUIR_AREAS:
+                del _bloque[_a]
+
+def meses_con_datos(bloque):
+    """Ultimo mes con dato real (para comparar YTD contra el mismo periodo)."""
+    if not bloque:
+        return 0
+    ult = 0
+    for m in range(12):
+        if sum(v[m] for v in bloque.values()) > 0:
+            ult = m + 1
+    return ult
+
+N_MES = meses_con_datos(ING.get("2026", {}))
+PERIODO = f"{MESES[0]}–{MESES[N_MES-1]}" if N_MES else "sin datos"
+
+def total(bloque, hasta=12):
+    return sum(sum(v[:hasta]) for v in bloque.values())
+
+def por_area(bloque, hasta=12):
+    return {a: sum(v[:hasta]) for a, v in bloque.items()}
+
+def serie_mensual(bloque, areas=None):
+    ms = [0.0] * 12
+    for a, v in bloque.items():
+        if areas is not None and a not in areas:
+            continue
+        for m in range(12):
+            ms[m] += v[m]
+    return ms
+
+# ── Estilos (mismos que los otros tableros) ────────────────────────────────────
+st.markdown("""
+<style>
+section[data-testid="stSidebar"] img { pointer-events: none; }
+section[data-testid="stSidebar"] [data-testid="StyledFullScreenButton"] { display: none; }
+section[data-testid="stSidebar"] > div:first-child { padding-top: 0 !important; }
+section[data-testid="stSidebar"] .block-container { padding-top: 0 !important; }
+div[data-testid="stRadio"] > div { gap: 2px !important; }
+div[data-testid="stRadio"] label {
+    display: flex !important; align-items: center !important;
+    padding: 10px 14px !important; border-radius: 8px !important;
+    cursor: pointer !important; font-size: 0.9rem !important;
+    margin-bottom: 2px !important; transition: background 0.15s !important; border: none !important;
+}
+div[data-testid="stRadio"] label:hover { background: rgba(255,255,255,0.08) !important; }
+div[data-testid="stRadio"] label:has(input:checked) {
+    background: rgba(255,255,255,0.13) !important; font-weight: 600 !important;
+}
+div[data-testid="stRadio"] label > div:first-child { display: none !important; }
+div[data-testid="stRadio"] { border: none !important; }
+</style>
+""", unsafe_allow_html=True)
+
+with st.sidebar:
+    if LOGO_PATH.exists():
+        st.image(str(LOGO_PATH), use_container_width=True)
+    st.markdown("---")
+    st.caption("TABLEROS")
+    pagina = st.radio(
+        "",
+        ["Panorama", "Ingreso Semestral", "Venta Nueva"],
+        label_visibility="collapsed",
+        key="nav",
+    )
+    st.markdown("---")
+    st.caption(f"Town Hall · Datos a {MESES[N_MES-1] if N_MES else '—'} 2026")
+
+# ── Series base ────────────────────────────────────────────────────────────────
+B26, B25, B24, BPTO = ING.get("2026", {}), ING.get("2025", {}), ING.get("2024", {}), ING.get("PTO", {})
+V26, V25, V24, VPTO = VN.get("2026", {}), VN.get("2025", {}), VN.get("2024", {}), VN.get("PTO", {})
+
+# Comparaciones contra años completos: lo acumulado de 2026 se mide contra el
+# total anual de 2025, 2024 y el presupuesto. Es la vista de "avance del año".
+ING_2026  = total(B26)
+ING_2025  = total(B25)
+ING_2024  = total(B24)
+PTO_ANUAL = total(BPTO)
+
+AREAS = sorted(
+    {a for b in (B26, B25, B24, BPTO) for a in b},
+    key=lambda a: -sum(B26.get(a, [0]*12)[:N_MES] or [0]),
+)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PANORAMA
+# ══════════════════════════════════════════════════════════════════════════════
+if pagina == "Panorama":
+    st.title("Town Hall · 2026")
+    st.caption("Ingresos y venta nueva por área · Comparativo contra años completos · Importes en MXN")
+
+    if N_MES < 12:
+        st.info(f"2026 lleva **{N_MES} de 12 meses** ({PERIODO}). El crecimiento de 2026 se mide "
+                f"contra el **mismo periodo** de 2025 ({PERIODO}); el de 2025 es año completo vs 2024.")
+
+    # Crecimiento: 2025 completo vs 2024 completo; 2026 (parcial) vs el mismo periodo de 2025.
+    ing_25_ytd = total(B25, N_MES)
+    g_ing_25 = ING_2025 / ING_2024 - 1 if ING_2024 else None
+    g_ing_26 = ING_2026 / ing_25_ytd - 1 if ing_25_ytd else None
+    vn_24, vn_25, vn_26 = total(V24), total(V25), total(V26)
+
+    g2024, g2025, g2026 = st.columns(3)
+
+    with g2024:
+        with st.container(border=True):
+            st.markdown("##### 2024")
+            a, b = st.columns(2)
+            a.metric("Ingreso", fmt_m(ING_2024),
+                     delta="año completo", delta_color="off")
+            b.metric("Venta Nueva", fmt_m(vn_24))
+
+    with g2025:
+        with st.container(border=True):
+            st.markdown("##### 2025")
+            a, b = st.columns(2)
+            a.metric("Ingreso", fmt_m(ING_2025),
+                     delta=f"{pct(g_ing_25)} vs 2024" if g_ing_25 is not None else None)
+            b.metric("Venta Nueva", fmt_m(vn_25))
+
+    with g2026:
+        with st.container(border=True):
+            st.markdown(f"##### 2026 · {N_MES} de 12 meses")
+            a, b = st.columns(2)
+            a.metric("Ingreso", fmt_m(ING_2026),
+                     delta=f"{pct(g_ing_26)} vs 2025 (mismo periodo)" if g_ing_26 is not None else None)
+            b.metric("Venta Nueva", fmt_m(vn_26))
+
+    st.divider()
+    st.subheader("Ingreso mensual: 2026 vs 2025 vs 2024")
+    fig = go.Figure()
+    for nombre, bloque, color, dash in [
+        ("2024", B24, COLOR_2024, "dot"),
+        ("2025", B25, COLOR_2025, "dash"),
+        ("PTO 2026", BPTO, COLOR_PTO, "dashdot"),
+    ]:
+        if bloque:
+            fig.add_scatter(name=nombre, x=MESES, y=serie_mensual(bloque),
+                            mode="lines+markers",
+                            line=dict(color=color, width=2, dash=dash))
+    if B26:
+        s26 = serie_mensual(B26)[:N_MES]
+        fig.add_scatter(name="Real 2026", x=MESES[:N_MES], y=s26,
+                        mode="lines+markers",
+                        line=dict(color=COLOR_2026, width=4))
+    fig.update_layout(yaxis_tickformat="$,.0s", height=430,
+                      margin=dict(t=30, b=20),
+                      legend=dict(orientation="h", y=1.1))
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.divider()
+    st.subheader("Mix de ingreso 2026")
+    vals = {a: v for a, v in por_area(B26, N_MES).items() if v > 0}
+    fig_p = go.Figure(go.Pie(
+        labels=list(vals.keys()), values=list(vals.values()),
+        marker_colors=[COLORES.get(a, "#999") for a in vals],
+        hole=0.42, textinfo="label+percent", sort=True,
+    ))
+    fig_p.update_layout(height=460, margin=dict(t=20, b=20), showlegend=False)
+    st.plotly_chart(fig_p, use_container_width=True)
+
+    st.divider()
+    st.subheader("Por área: 2024 vs 2025 vs PTO 2026 vs Real 2026")
+    st.caption(f"2024 y 2025 son año completo y PTO 2026 es el presupuesto anual; "
+               f"Real 2026 es lo acumulado ({PERIODO}, {N_MES} de 12 meses).")
+    a24, a25, apto, areal = por_area(B24), por_area(B25), por_area(BPTO), por_area(B26)
+    areas_y = sorted(
+        [a for a in AREAS if any(d.get(a, 0) > 0 for d in (a24, a25, apto, areal))],
+        key=lambda a: -apto.get(a, 0),
+    )
+    fig_cmp = go.Figure()
+    for etq, d, col in [("2024", a24, COLOR_2024),
+                        ("2025", a25, COLOR_2025),
+                        ("PTO 2026", apto, COLOR_PTO),
+                        (f"Real 2026 ({N_MES}m)", areal, COLOR_2026)]:
+        fig_cmp.add_bar(name=etq, orientation="h", y=areas_y,
+                        x=[d.get(a, 0) for a in areas_y], marker_color=col,
+                        text=[fmt_m(d.get(a, 0)) for a in areas_y],
+                        textposition="auto", textfont=dict(size=9))
+    fig_cmp.update_layout(barmode="group", height=640, xaxis_tickformat="$,.0s",
+                          yaxis=dict(autorange="reversed"),
+                          margin=dict(t=30, b=20),
+                          legend=dict(orientation="h", y=1.06))
+    st.plotly_chart(fig_cmp, use_container_width=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INGRESOS MENSUAL
+# ══════════════════════════════════════════════════════════════════════════════
+if pagina == "Ingreso Semestral":
+    SEM = 6
+    def h1(bl, a):
+        return sum(bl.get(a, [0] * 12)[:SEM])
+
+    # (etiqueta, bloque, color, bloque del año anterior para el % de crecimiento)
+    series = [("1er sem 2024", B24, COLOR_2024, None),
+              ("1er sem 2025", B25, COLOR_2025, B24),
+              ("1er sem 2026", B26, COLOR_2026, B25)]
+    areas_sem = [a for a in AREAS
+                 if any(h1(bl, a) > 0 for _, bl, _, _ in series)]
+
+    # ── Carrusel de crecimiento por línea de negocio (de 2 en 2) ────────────────
+    st.subheader("Crecimiento por línea de negocio · 1er semestre")
+    PASO = 2
+    n = len(areas_sem)
+    total_pag = max(1, (n + PASO - 1) // PASO)
+    if "ing_pag" not in st.session_state:
+        st.session_state.ing_pag = 0
+
+    c_prev, c_lbl, c_next = st.columns([1, 6, 1])
+    if c_prev.button("◀", key="ing_prev", use_container_width=True):
+        st.session_state.ing_pag = (st.session_state.ing_pag - 1) % total_pag
+    if c_next.button("▶", key="ing_next", use_container_width=True):
+        st.session_state.ing_pag = (st.session_state.ing_pag + 1) % total_pag
+    pag = st.session_state.ing_pag % total_pag
+    c_lbl.markdown(
+        f"<div style='text-align:center;padding-top:8px;color:#9aa0a6'>"
+        f"Líneas {pag*PASO+1}–{min((pag+1)*PASO, n)} de {n}</div>",
+        unsafe_allow_html=True,
+    )
+
+    fila = st.columns(PASO)
+    for col, a in zip(fila, areas_sem[pag*PASO:(pag+1)*PASO]):
+        s24, s25, s26 = h1(B24, a), h1(B25, a), h1(B26, a)
+        with col, st.container(border=True):
+            st.markdown(f"##### {a}")
+            m1, m2, m3 = st.columns(3)
+            m1.metric("2024", fmt_m(s24))
+            m2.metric("2025 vs 24", fmt_m(s25),
+                      delta=pct(s25 / s24 - 1) if s24 > 0 else None)
+            m3.metric("2026 vs 25", fmt_m(s26),
+                      delta=pct(s26 / s25 - 1) if s25 > 0 else None)
+
+    st.divider()
+    st.subheader("Ingreso por área · primer semestre por año")
+    fig = go.Figure()
+    for etq, bl, col, prev in series:
+        y = [h1(bl, a) for a in areas_sem]
+        txt = None
+        if prev is not None:
+            txt = [pct(h1(bl, a) / h1(prev, a) - 1) if h1(prev, a) > 0 else ""
+                   for a in areas_sem]
+        fig.add_bar(name=etq, x=areas_sem, y=y, marker_color=col,
+                    text=txt, textposition="outside",
+                    textfont=dict(size=10), cliponaxis=False)
+    fig.update_layout(barmode="group", bargap=0.25, bargroupgap=0.05,
+                      yaxis_tickformat="$,.0s", height=460,
+                      margin=dict(t=50, b=20),
+                      legend=dict(orientation="h", y=1.12))
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.divider()
+    st.subheader("Real 2026 vs Presupuesto anual por área")
+    st.caption(f"Real acumulado ({PERIODO}, {N_MES} de 12 meses) contra el presupuesto anual.")
+    real_a, pto_a = por_area(B26), por_area(BPTO)
+    areas_cmp = [a for a in AREAS if real_a.get(a, 0) > 0 or pto_a.get(a, 0) > 0]
+    fig_rp = go.Figure()
+    fig_rp.add_bar(name="PTO", x=areas_cmp, y=[pto_a.get(a, 0) for a in areas_cmp],
+                   marker_color=COLOR_PTO)
+    fig_rp.add_bar(name="Real", x=areas_cmp, y=[real_a.get(a, 0) for a in areas_cmp],
+                   marker_color=COLOR_2026)
+    fig_rp.update_layout(barmode="group", yaxis_tickformat="$,.0s", height=420,
+                         margin=dict(t=30, b=20),
+                         legend=dict(orientation="h", y=1.1))
+    st.plotly_chart(fig_rp, use_container_width=True)
+
+    # La tabla de detalle muestra el bloque 2026 Real.
+    año = "2026"
+    bloque = B26
+    hasta = N_MES
+    areas_b = [a for a in AREAS if a in bloque and sum(bloque[a]) > 0]
+
+    st.divider()
+    st.subheader(f"Detalle mensual 2026 · {PERIODO}")
+    filas = []
+    for a in areas_b:
+        fila = {"Área": a}
+        for m in range(hasta):
+            fila[MESES[m]] = fmt(bloque[a][m])
+        fila["Total"] = fmt(sum(bloque[a][:hasta]))
+        filas.append(fila)
+    tot_fila = {"Área": "TOTAL"}
+    for m in range(hasta):
+        tot_fila[MESES[m]] = fmt(sum(bloque[a][m] for a in areas_b))
+    tot_fila["Total"] = fmt(sum(sum(bloque[a][:hasta]) for a in areas_b))
+    filas.append(tot_fila)
+    st.dataframe(pd.DataFrame(filas), use_container_width=True, hide_index=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# VENTA NUEVA
+# ══════════════════════════════════════════════════════════════════════════════
+if pagina == "Venta Nueva":
+    st.subheader("Venta Nueva 2026")
+    st.caption(f"Acumulado de 2026 ({PERIODO}, {N_MES} de 12 meses) contra años completos.")
+
+    vn_ytd = total(V26)
+    vnpto_anual = total(VPTO)
+    vn25, vn24 = total(V25), total(V24)
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric(f"VN 2026 ({N_MES} meses)", fmt_m(vn_ytd),
+              delta=f"{pct(vn_ytd/vn25-1)} vs año 2025" if vn25 else None)
+    c2.metric("Año 2025 completo", fmt_m(vn25),
+              delta=f"2024: {fmt_m(vn24)}", delta_color="off")
+    c3.metric("PTO anual 2026", fmt_m(vnpto_anual))
+    c4.metric("Avance del PTO anual",
+              pct(vn_ytd/vnpto_anual) if vnpto_anual else "—",
+              delta=f"Falta {fmt_m(vn_ytd - vnpto_anual)}", delta_color="off")
+
+    st.divider()
+    st.subheader("Venta Nueva mensual")
+    fig = go.Figure()
+    for nombre, bloque, color, dash in [
+        ("2024", V24, COLOR_2024, "dot"),
+        ("2025", V25, COLOR_2025, "dash"),
+        ("PTO 2026", VPTO, COLOR_PTO, "dashdot"),
+    ]:
+        if bloque:
+            fig.add_scatter(name=nombre, x=MESES, y=serie_mensual(bloque),
+                            mode="lines+markers",
+                            line=dict(color=color, width=2, dash=dash))
+    if V26:
+        fig.add_scatter(name="Real 2026", x=MESES[:N_MES],
+                        y=serie_mensual(V26)[:N_MES],
+                        mode="lines+markers", line=dict(color=COLOR_2026, width=4))
+    fig.update_layout(yaxis_tickformat="$,.0s", height=420,
+                      margin=dict(t=30, b=20),
+                      legend=dict(orientation="h", y=1.1))
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.divider()
+    col_a, col_b = st.columns(2)
+    vn_area = {a: v for a, v in por_area(V26).items() if v > 0}
+    vnpto_area = por_area(VPTO)
+    with col_a:
+        st.subheader("VN por área · acumulado 2026")
+        fig_a = go.Figure(go.Bar(
+            x=list(vn_area.values()), y=list(vn_area.keys()), orientation="h",
+            marker_color=[COLORES.get(a, "#999") for a in vn_area],
+            text=[fmt_m(v) for v in vn_area.values()], textposition="auto",
+        ))
+        fig_a.update_layout(height=380, xaxis_tickformat="$,.0s",
+                            yaxis=dict(autorange="reversed"), margin=dict(t=20, b=20))
+        st.plotly_chart(fig_a, use_container_width=True)
+    with col_b:
+        st.subheader("VN acumulado vs PTO anual por área")
+        areas_vn = [a for a in vnpto_area if vnpto_area[a] > 0 or vn_area.get(a, 0) > 0]
+        fig_c = go.Figure()
+        fig_c.add_bar(name="PTO", x=areas_vn, y=[vnpto_area.get(a, 0) for a in areas_vn],
+                      marker_color=COLOR_PTO)
+        fig_c.add_bar(name="Real", x=areas_vn, y=[vn_area.get(a, 0) for a in areas_vn],
+                      marker_color=COLOR_2026)
+        fig_c.update_layout(barmode="group", height=380, yaxis_tickformat="$,.0s",
+                            margin=dict(t=20, b=20),
+                            legend=dict(orientation="h", y=1.12))
+        st.plotly_chart(fig_c, use_container_width=True)
+
+    filas = []
+    for a in sorted(set(vn_area) | set(k for k, v in vnpto_area.items() if v > 0),
+                    key=lambda x: -vn_area.get(x, 0)):
+        r, p = vn_area.get(a, 0), vnpto_area.get(a, 0)
+        filas.append({"Área": a, "Real acumulado": fmt(r), "PTO anual": fmt(p),
+                      "Falta": fmt(r - p),
+                      "Avance": pct(r/p) if p else "—"})
+    filas.append({"Área": "TOTAL", "Real acumulado": fmt(vn_ytd),
+                  "PTO anual": fmt(vnpto_anual),
+                  "Falta": fmt(vn_ytd - vnpto_anual),
+                  "Avance": pct(vn_ytd/vnpto_anual) if vnpto_anual else "—"})
+    st.dataframe(pd.DataFrame(filas), use_container_width=True, hide_index=True)

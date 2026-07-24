@@ -1,0 +1,11 @@
+[theme]
+# Forzado a oscuro: las tablas HTML del tablero llevan colores fijos para fondo
+# oscuro, asi que sin esto un visitante con el sistema en claro las veria ilegibles.
+base = "dark"
+primaryColor = "#1f77b4"
+
+[browser]
+gatherUsageStats = false
+
+[server]
+headless = true
