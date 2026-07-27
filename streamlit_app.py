@@ -2,6 +2,7 @@ import openpyxl
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+import streamlit.components.v1 as components
 from pathlib import Path
 
 st.set_page_config(
@@ -48,13 +49,9 @@ def fmt(v):
     return f"${v:,.0f}"
 
 def fmt_m(v):
+    # Importe exacto, sin redondear a millones ni a miles (mismo formato que fmt).
     if v is None or (isinstance(v, float) and pd.isna(v)):
         return "—"
-    a = abs(v)
-    if a >= 1e6:
-        return f"${v/1e6:,.1f}M"
-    if a >= 1e3:
-        return f"${v/1e3:,.0f}k"
     return f"${v:,.0f}"
 
 def pct(v):
@@ -186,8 +183,21 @@ div[data-testid="stRadio"] label:has(input:checked) {
 }
 div[data-testid="stRadio"] label > div:first-child { display: none !important; }
 div[data-testid="stRadio"] { border: none !important; }
+/* Montos exactos son largos: fuente menor y sin corte para que quepan completos. */
+div[data-testid="stMetricValue"] {
+    font-size: 1.35rem !important; line-height: 1.2 !important;
+    white-space: nowrap !important; overflow: visible !important;
+}
+div[data-testid="stMetricValue"] > div { overflow: visible !important; }
 </style>
 """, unsafe_allow_html=True)
+
+# Evita que el traductor del navegador reformatee los montos ("$18.6M" -> "18,6 millones").
+components.html(
+    "<script>try{var d=window.parent.document.documentElement;"
+    "d.setAttribute('translate','no');d.classList.add('notranslate');}catch(e){}</script>",
+    height=0,
+)
 
 with st.sidebar:
     if LOGO_PATH.exists():
@@ -279,7 +289,7 @@ if pagina == "Panorama":
         fig.add_scatter(name="Real 2026", x=MESES[:N_MES], y=s26,
                         mode="lines+markers",
                         line=dict(color=COLOR_2026, width=4))
-    fig.update_layout(yaxis_tickformat="$,.0s", height=430,
+    fig.update_layout(yaxis_tickformat="$,.0f", height=430,
                       margin=dict(t=30, b=20),
                       legend=dict(orientation="h", y=1.1))
     st.plotly_chart(fig, use_container_width=True)
@@ -313,7 +323,7 @@ if pagina == "Panorama":
                         x=[d.get(a, 0) for a in areas_y], marker_color=col,
                         text=[fmt_m(d.get(a, 0)) for a in areas_y],
                         textposition="auto", textfont=dict(size=9))
-    fig_cmp.update_layout(barmode="group", height=640, xaxis_tickformat="$,.0s",
+    fig_cmp.update_layout(barmode="group", height=640, xaxis_tickformat="$,.0f",
                           yaxis=dict(autorange="reversed"),
                           margin=dict(t=30, b=20),
                           legend=dict(orientation="h", y=1.06))
@@ -379,7 +389,7 @@ if pagina == "Ingreso Semestral":
                     text=txt, textposition="outside",
                     textfont=dict(size=10), cliponaxis=False)
     fig.update_layout(barmode="group", bargap=0.25, bargroupgap=0.05,
-                      yaxis_tickformat="$,.0s", height=460,
+                      yaxis_tickformat="$,.0f", height=460,
                       margin=dict(t=50, b=20),
                       legend=dict(orientation="h", y=1.12))
     st.plotly_chart(fig, use_container_width=True)
@@ -394,7 +404,7 @@ if pagina == "Ingreso Semestral":
                    marker_color=COLOR_PTO)
     fig_rp.add_bar(name="Real", x=areas_cmp, y=[real_a.get(a, 0) for a in areas_cmp],
                    marker_color=COLOR_2026)
-    fig_rp.update_layout(barmode="group", yaxis_tickformat="$,.0s", height=420,
+    fig_rp.update_layout(barmode="group", yaxis_tickformat="$,.0f", height=420,
                          margin=dict(t=30, b=20),
                          legend=dict(orientation="h", y=1.1))
     st.plotly_chart(fig_rp, use_container_width=True)
@@ -425,21 +435,24 @@ if pagina == "Ingreso Semestral":
 # VENTA NUEVA
 # ══════════════════════════════════════════════════════════════════════════════
 if pagina == "Venta Nueva":
-    st.subheader("Venta Nueva 2026")
-    st.caption(f"Acumulado de 2026 ({PERIODO}, {N_MES} de 12 meses) contra años completos.")
-
+    # Vars anuales que siguen usando la gráfica y la tabla de abajo.
     vn_ytd = total(V26)
     vnpto_anual = total(VPTO)
     vn25, vn24 = total(V25), total(V24)
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric(f"VN 2026 ({N_MES} meses)", fmt_m(vn_ytd),
-              delta=f"{pct(vn_ytd/vn25-1)} vs año 2025" if vn25 else None)
-    c2.metric("Año 2025 completo", fmt_m(vn25),
-              delta=f"2024: {fmt_m(vn24)}", delta_color="off")
-    c3.metric("PTO anual 2026", fmt_m(vnpto_anual))
-    c4.metric("Avance del PTO anual",
-              pct(vn_ytd/vnpto_anual) if vnpto_anual else "—",
-              delta=f"Falta {fmt_m(vn_ytd - vnpto_anual)}", delta_color="off")
+
+    # Primer semestre (Ene–Jun) para las tarjetas.
+    SEM = 6
+    vs24, vs25 = total(V24, SEM), total(V25, SEM)
+    vspto, vsreal = total(VPTO, SEM), total(V26, SEM)
+    with st.container(border=True):
+        st.markdown("##### VENTA NUEVA · 1er semestre")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("1er sem 2024", fmt_m(vs24))
+        c2.metric("2025 vs 24", fmt_m(vs25),
+                  delta=pct(vs25 / vs24 - 1) if vs24 else None)
+        c3.metric("Real 2026 vs 25", fmt_m(vsreal),
+                  delta=pct(vsreal / vs25 - 1) if vs25 else None)
+        c4.metric("PTO 2026", fmt_m(vspto))
 
     st.divider()
     st.subheader("Venta Nueva mensual")
@@ -457,7 +470,7 @@ if pagina == "Venta Nueva":
         fig.add_scatter(name="Real 2026", x=MESES[:N_MES],
                         y=serie_mensual(V26)[:N_MES],
                         mode="lines+markers", line=dict(color=COLOR_2026, width=4))
-    fig.update_layout(yaxis_tickformat="$,.0s", height=420,
+    fig.update_layout(yaxis_tickformat="$,.0f", height=420,
                       margin=dict(t=30, b=20),
                       legend=dict(orientation="h", y=1.1))
     st.plotly_chart(fig, use_container_width=True)
@@ -473,7 +486,7 @@ if pagina == "Venta Nueva":
             marker_color=[COLORES.get(a, "#999") for a in vn_area],
             text=[fmt_m(v) for v in vn_area.values()], textposition="auto",
         ))
-        fig_a.update_layout(height=380, xaxis_tickformat="$,.0s",
+        fig_a.update_layout(height=380, xaxis_tickformat="$,.0f",
                             yaxis=dict(autorange="reversed"), margin=dict(t=20, b=20))
         st.plotly_chart(fig_a, use_container_width=True)
     with col_b:
@@ -484,7 +497,7 @@ if pagina == "Venta Nueva":
                       marker_color=COLOR_PTO)
         fig_c.add_bar(name="Real", x=areas_vn, y=[vn_area.get(a, 0) for a in areas_vn],
                       marker_color=COLOR_2026)
-        fig_c.update_layout(barmode="group", height=380, yaxis_tickformat="$,.0s",
+        fig_c.update_layout(barmode="group", height=380, yaxis_tickformat="$,.0f",
                             margin=dict(t=20, b=20),
                             legend=dict(orientation="h", y=1.12))
         st.plotly_chart(fig_c, use_container_width=True)
