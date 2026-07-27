@@ -15,7 +15,7 @@ st.set_page_config(
 # Rutas relativas al propio archivo: funcionan igual en Windows y en Linux (la nube).
 BASE = Path(__file__).parent
 EXCEL_PATH = BASE / "EXCEL" / "Town Hall Julio 2026.xlsx"
-LOGO_PATH = BASE / "imagenes" / "logo2.png"
+LOGO_PATH = BASE / "imagenes" / "Ancora Logo.jpeg"
 
 MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
          "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
