@@ -15,32 +15,42 @@ st.set_page_config(
 # Rutas relativas al propio archivo: funcionan igual en Windows y en Linux (la nube).
 BASE = Path(__file__).parent
 EXCEL_PATH = BASE / "EXCEL" / "Town Hall Julio 2026.xlsx"
-LOGO_PATH = BASE / "imagenes" / "Ancora Logo.jpeg"
+# Logo en negativo (marcas off-white, fondo transparente) para el sidebar navy.
+LOGO_PATH = BASE / "imagenes" / "ancora_blanco.png"
 
 MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
          "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 
+# ── Paleta de marca Ancora ──────────────────────────────────────────────────────
+# Primarios: navy #13375c · off-white #F6F6F6 · teal #1d7b8a · dorado #e9ba40.
+MARCA_NAVY = "#13375c"
+MARCA_CLARO = "#F6F6F6"
+MARCA_TEAL = "#1d7b8a"
+MARCA_ORO = "#e9ba40"
+
+# Paleta categórica por área, anclada en los primarios de marca y extendida con
+# tonos armónicos para que las 9 áreas se distingan sobre fondo oscuro.
 COLORES = {
-    "BENEFICIOS":    "#1f77b4",
-    "LF":            "#d62728",
-    "DAÑOS":         "#2ca02c",
-    "FIANZAS":       "#ff7f0e",
-    "LP":            "#8c564b",
-    "AUTOS":         "#9467bd",
-    "BONO":          "#17becf",
-    "ANI":           "#e377c2",
-    "AFFINITY":      "#7f7f7f",
-    "HONORARIOS":    "#bcbd22",
+    "BENEFICIOS":    MARCA_TEAL,   # teal (marca)
+    "LF":            MARCA_ORO,    # dorado (marca)
+    "DAÑOS":         "#3a6ea5",    # azul acero (navy aclarado)
+    "FIANZAS":       "#d97b3c",    # terracota (complementa el dorado)
+    "LP":            "#4aa3b0",    # teal claro
+    "AUTOS":         "#8a6d4b",    # bronce
+    "BONO":          "#6f9bc4",    # azul medio
+    "ANI":           "#b58fb0",    # malva
+    "AFFINITY":      "#9aa5b1",    # gris azulado (familia off-white)
+    "HONORARIOS":    "#c99a2e",    # dorado oscuro
     "INTERNACIONAL": "#aec7e8",
 }
-# Cuatro hues bien separados y visibles sobre fondo oscuro: gris (histórico 2024),
-# verde (2025), ámbar (meta/PTO) y azul brillante (real 2026, la línea protagonista).
-COLOR_2024 = "#9aa0a6"   # gris medio · dotted
-COLOR_2025 = "#51cf66"   # verde claro · dashed
-COLOR_PTO  = "#ffd166"   # ámbar · dashdot (línea de meta)
-COLOR_2026 = "#4dabf7"   # azul brillante · sólido (protagonista)
-C_NEG = "#ff6b6b"
-C_POS = "#51cf66"
+# Series de comparación por año, en la familia de marca: gris (2024), navy acero
+# (2025), dorado = meta/PTO y teal = real 2026 (la línea protagonista).
+COLOR_2024 = "#9aa5b1"   # gris azulado · dotted
+COLOR_2025 = "#3a6ea5"   # navy acero · dashed
+COLOR_PTO  = MARCA_ORO   # dorado · dashdot (línea de meta)
+COLOR_2026 = MARCA_TEAL  # teal · sólido (protagonista)
+C_NEG = "#e05c5c"        # rojo (semántico: por debajo)
+C_POS = MARCA_TEAL       # teal (semántico: a favor)
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 def fmt(v):
@@ -128,7 +138,7 @@ if not ING:
     st.stop()
 
 # Áreas excluidas de todo el tablero.
-EXCLUIR_AREAS = {"INTERNACIONAL"}
+EXCLUIR_AREAS = {"INTERNACIONAL", "ANI"}
 for _grupo in (ING, VN):
     for _bloque in _grupo.values():
         for _a in list(_bloque):
@@ -166,6 +176,21 @@ def serie_mensual(bloque, areas=None):
 # ── Estilos (mismos que los otros tableros) ────────────────────────────────────
 st.markdown("""
 <style>
+/* Fuente de marca Ancora: Montserrat. El @import debe ir primero en el <style>. */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
+/* Montserrat en todo EXCEPTO los iconos Material, que llevan su propia fuente. */
+html, body, [data-testid="stAppViewContainer"], [data-testid="stSidebar"], .stApp,
+.stApp *:not([data-testid="stIconMaterial"]) {
+    font-family: 'Montserrat', sans-serif !important;
+}
+[data-testid="stIconMaterial"] { font-family: 'Material Symbols Rounded' !important; }
+/* Cuerpo sobre fondo oscuro: Medium (500). */
+[data-testid="stAppViewContainer"], [data-testid="stMarkdownContainer"],
+p, span:not([data-testid="stIconMaterial"]), label, td, th, li,
+div[data-testid="stMetricValue"], div[data-testid="stMetricDelta"], .stDataFrame { font-weight: 500; }
+/* Títulos: Semibold (600). */
+h1, h2, h3, h4, h5, h6, div[data-testid="stMetricLabel"] p { font-weight: 600 !important; }
+
 section[data-testid="stSidebar"] img { pointer-events: none; }
 section[data-testid="stSidebar"] [data-testid="StyledFullScreenButton"] { display: none; }
 section[data-testid="stSidebar"] > div:first-child { padding-top: 0 !important; }
@@ -245,6 +270,9 @@ if pagina == "Panorama":
     g_ing_25 = ING_2025 / ING_2024 - 1 if ING_2024 else None
     g_ing_26 = ING_2026 / ing_25_ytd - 1 if ing_25_ytd else None
     vn_24, vn_25, vn_26 = total(V24), total(V25), total(V26)
+    vn_25_ytd = total(V25, N_MES)
+    g_vn_25 = vn_25 / vn_24 - 1 if vn_24 else None
+    g_vn_26 = vn_26 / vn_25_ytd - 1 if vn_25_ytd else None
 
     g2024, g2025, g2026 = st.columns(3)
 
@@ -254,7 +282,8 @@ if pagina == "Panorama":
             a, b = st.columns(2)
             a.metric("Ingreso", fmt_m(ING_2024),
                      delta="año completo", delta_color="off")
-            b.metric("Venta Nueva", fmt_m(vn_24))
+            b.metric("Venta Nueva", fmt_m(vn_24),
+                     delta="año completo", delta_color="off")
 
     with g2025:
         with st.container(border=True):
@@ -262,7 +291,8 @@ if pagina == "Panorama":
             a, b = st.columns(2)
             a.metric("Ingreso", fmt_m(ING_2025),
                      delta=f"{pct(g_ing_25)} vs 2024" if g_ing_25 is not None else None)
-            b.metric("Venta Nueva", fmt_m(vn_25))
+            b.metric("Venta Nueva", fmt_m(vn_25),
+                     delta=f"{pct(g_vn_25)} vs 2024" if g_vn_25 is not None else None)
 
     with g2026:
         with st.container(border=True):
@@ -270,7 +300,8 @@ if pagina == "Panorama":
             a, b = st.columns(2)
             a.metric("Ingreso", fmt_m(ING_2026),
                      delta=f"{pct(g_ing_26)} vs 2025 (mismo periodo)" if g_ing_26 is not None else None)
-            b.metric("Venta Nueva", fmt_m(vn_26))
+            b.metric("Venta Nueva", fmt_m(vn_26),
+                     delta=f"{pct(g_vn_26)} vs 2025 (mismo periodo)" if g_vn_26 is not None else None)
 
     st.divider()
     st.subheader("Ingreso mensual: 2026 vs 2025 vs 2024")
@@ -295,15 +326,27 @@ if pagina == "Panorama":
     st.plotly_chart(fig, use_container_width=True)
 
     st.divider()
-    st.subheader("Mix de ingreso 2026")
-    vals = {a: v for a, v in por_area(B26, N_MES).items() if v > 0}
-    fig_p = go.Figure(go.Pie(
-        labels=list(vals.keys()), values=list(vals.values()),
-        marker_colors=[COLORES.get(a, "#999") for a in vals],
-        hole=0.42, textinfo="label+percent", sort=True,
-    ))
-    fig_p.update_layout(height=460, margin=dict(t=20, b=20), showlegend=False)
-    st.plotly_chart(fig_p, use_container_width=True)
+    col_mix1, col_mix2 = st.columns(2)
+    with col_mix1:
+        st.subheader(f"Mix de ingreso 2026 ({N_MES}m)")
+        vals = {a: v for a, v in por_area(B26, N_MES).items() if v > 0}
+        fig_p = go.Figure(go.Pie(
+            labels=list(vals.keys()), values=list(vals.values()),
+            marker_colors=[COLORES.get(a, "#999") for a in vals],
+            hole=0.42, textinfo="label+percent", sort=True,
+        ))
+        fig_p.update_layout(height=460, margin=dict(t=20, b=20), showlegend=False)
+        st.plotly_chart(fig_p, use_container_width=True)
+    with col_mix2:
+        st.subheader("Mix de presupuesto 2026")
+        vals_pto = {a: v for a, v in por_area(BPTO).items() if v > 0}
+        fig_ppto = go.Figure(go.Pie(
+            labels=list(vals_pto.keys()), values=list(vals_pto.values()),
+            marker_colors=[COLORES.get(a, "#999") for a in vals_pto],
+            hole=0.42, textinfo="label+percent", sort=True,
+        ))
+        fig_ppto.update_layout(height=460, margin=dict(t=20, b=20), showlegend=False)
+        st.plotly_chart(fig_ppto, use_container_width=True)
 
     st.divider()
     st.subheader("Por área: 2024 vs 2025 vs PTO 2026 vs Real 2026")
@@ -314,18 +357,40 @@ if pagina == "Panorama":
         [a for a in AREAS if any(d.get(a, 0) > 0 for d in (a24, a25, apto, areal))],
         key=lambda a: -apto.get(a, 0),
     )
+    def _texto_real(a):
+        """Monto real + % que falta para alcanzar el PTO anual de esa área."""
+        real, pto = areal.get(a, 0), apto.get(a, 0)
+        if pto <= 0:
+            return fmt_m(real)
+        falta = (pto - real) / pto
+        if falta <= 0:
+            return f"{fmt_m(real)} · meta cumplida"
+        return f"{fmt_m(real)} · falta {falta*100:.0f}% del PTO"
+
     fig_cmp = go.Figure()
     for etq, d, col in [("2024", a24, COLOR_2024),
                         ("2025", a25, COLOR_2025),
                         ("PTO 2026", apto, COLOR_PTO),
                         (f"Real 2026 ({N_MES}m)", areal, COLOR_2026)]:
-        fig_cmp.add_bar(name=etq, orientation="h", y=areas_y,
-                        x=[d.get(a, 0) for a in areas_y], marker_color=col,
-                        text=[fmt_m(d.get(a, 0)) for a in areas_y],
-                        textposition="auto", textfont=dict(size=9))
-    fig_cmp.update_layout(barmode="group", height=640, xaxis_tickformat="$,.0f",
+        es_real = d is areal
+        textos = ([_texto_real(a) for a in areas_y] if es_real
+                  else [fmt_m(d.get(a, 0)) for a in areas_y])
+        fig_cmp.add_bar(
+            name=etq, orientation="h", y=areas_y,
+            x=[d.get(a, 0) for a in areas_y], marker_color=col,
+            text=textos,
+            # El Real lleva su etiqueta fija por fuera (a la derecha de la barra);
+            # las demas por dentro. El PTO es la barra mas larga, cabe bien el avance.
+            textposition="outside" if es_real else "inside",
+            insidetextanchor="middle",
+            textfont=dict(size=10, color=("#e0e0e0" if es_real else "#111")),
+            cliponaxis=False,
+            constraintext="none" if es_real else "both",
+        )
+    fig_cmp.update_layout(barmode="group", height=760, xaxis_tickformat="$,.0f",
                           yaxis=dict(autorange="reversed"),
-                          margin=dict(t=30, b=20),
+                          margin=dict(t=30, b=20, r=140),
+                          uniformtext=dict(minsize=8, mode="show"),
                           legend=dict(orientation="h", y=1.06))
     st.plotly_chart(fig_cmp, use_container_width=True)
 
@@ -452,7 +517,9 @@ if pagina == "Venta Nueva":
                   delta=pct(vs25 / vs24 - 1) if vs24 else None)
         c3.metric("Real 2026 vs 25", fmt_m(vsreal),
                   delta=pct(vsreal / vs25 - 1) if vs25 else None)
-        c4.metric("PTO 2026", fmt_m(vspto))
+        c4.metric("PTO 2026", fmt_m(vspto),
+                  delta=f"avance {vsreal/vspto*100:.0f}% del real" if vspto else None,
+                  delta_color="off")
 
     st.divider()
     st.subheader("Venta Nueva mensual")
