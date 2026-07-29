@@ -21,6 +21,9 @@ LOGO_PATH = BASE / "imagenes" / "ancora_blanco.png"
 MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
          "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 
+# Proyección de ingreso para el cierre del año 2026 (dato provisto, editable).
+PROY_ANUAL_2026 = 160_000_000
+
 # ── Paleta de marca Ancora ──────────────────────────────────────────────────────
 # Primarios: navy #13375c · off-white #F6F6F6 · teal #1d7b8a · dorado #e9ba40.
 MARCA_NAVY = "#13375c"
@@ -302,6 +305,7 @@ if pagina == "Panorama":
                      delta=f"{pct(g_ing_26)} vs 2025 (mismo periodo)" if g_ing_26 is not None else None)
             b.metric("Venta Nueva", fmt_m(vn_26),
                      delta=f"{pct(g_vn_26)} vs 2025 (mismo periodo)" if g_vn_26 is not None else None)
+            st.caption(f"Proyección de ingreso al cierre del año: **{fmt(PROY_ANUAL_2026)}**")
 
     st.divider()
     st.subheader("Ingreso mensual: 2026 vs 2025 vs 2024")
