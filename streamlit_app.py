@@ -357,30 +357,45 @@ if pagina == "Panorama":
         [a for a in AREAS if any(d.get(a, 0) > 0 for d in (a24, a25, apto, areal))],
         key=lambda a: -apto.get(a, 0),
     )
+    a25_ytd = por_area(B25, N_MES)   # 2025 al mismo periodo que el Real (para su crecimiento)
+
+    def _crece(nuevo, viejo, suf):
+        """Sufijo con el % de crecimiento vs el año/periodo de referencia."""
+        if not viejo:
+            return ""
+        g = nuevo / viejo - 1
+        return f" · {'+' if g >= 0 else ''}{g*100:.0f}% {suf}"
+
     def _texto_real(a):
-        """Monto real + % que falta para alcanzar el PTO anual de esa área."""
+        """Monto real + crecimiento vs 2025 (mismo periodo) + % que falta al PTO."""
         real, pto = areal.get(a, 0), apto.get(a, 0)
-        if pto <= 0:
-            return fmt_m(real)
-        falta = (pto - real) / pto
-        if falta <= 0:
-            return f"{fmt_m(real)} · meta cumplida"
-        return f"{fmt_m(real)} · falta {falta*100:.0f}% del PTO"
+        txt = fmt_m(real) + _crece(real, a25_ytd.get(a, 0), "vs 25")
+        if pto > 0:
+            falta = (pto - real) / pto
+            txt += " · meta cumplida" if falta <= 0 else f" · falta {falta*100:.0f}% PTO"
+        return txt
+
+    # (etiqueta, datos, color, referencia_para_crecimiento, sufijo)
+    series = [("2024", a24, COLOR_2024, None, ""),
+              ("2025", a25, COLOR_2025, a24, "vs 24"),
+              ("PTO 2026", apto, COLOR_PTO, a25, "vs 25"),
+              (f"Real 2026 ({N_MES}m)", areal, COLOR_2026, None, "")]
 
     fig_cmp = go.Figure()
-    for etq, d, col in [("2024", a24, COLOR_2024),
-                        ("2025", a25, COLOR_2025),
-                        ("PTO 2026", apto, COLOR_PTO),
-                        (f"Real 2026 ({N_MES}m)", areal, COLOR_2026)]:
+    for etq, d, col, ref, suf in series:
         es_real = d is areal
-        textos = ([_texto_real(a) for a in areas_y] if es_real
-                  else [fmt_m(d.get(a, 0)) for a in areas_y])
+        if es_real:
+            textos = [_texto_real(a) for a in areas_y]
+        elif ref is not None:
+            textos = [fmt_m(d.get(a, 0)) + _crece(d.get(a, 0), ref.get(a, 0), suf)
+                      for a in areas_y]
+        else:  # 2024 es la base, sin crecimiento
+            textos = [fmt_m(d.get(a, 0)) for a in areas_y]
         fig_cmp.add_bar(
             name=etq, orientation="h", y=areas_y,
             x=[d.get(a, 0) for a in areas_y], marker_color=col,
             text=textos,
-            # El Real lleva su etiqueta fija por fuera (a la derecha de la barra);
-            # las demas por dentro. El PTO es la barra mas larga, cabe bien el avance.
+            # El Real lleva su etiqueta fija por fuera; las demas por dentro.
             textposition="outside" if es_real else "inside",
             insidetextanchor="middle",
             textfont=dict(size=10, color=("#e0e0e0" if es_real else "#111")),
@@ -389,7 +404,7 @@ if pagina == "Panorama":
         )
     fig_cmp.update_layout(barmode="group", height=760, xaxis_tickformat="$,.0f",
                           yaxis=dict(autorange="reversed"),
-                          margin=dict(t=30, b=20, r=140),
+                          margin=dict(t=30, b=20, r=210),
                           uniformtext=dict(minsize=8, mode="show"),
                           legend=dict(orientation="h", y=1.06))
     st.plotly_chart(fig_cmp, use_container_width=True)
