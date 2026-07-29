@@ -217,6 +217,12 @@ div[data-testid="stMetricValue"] {
     white-space: nowrap !important; overflow: visible !important;
 }
 div[data-testid="stMetricValue"] > div { overflow: visible !important; }
+/* Tarjetas de la misma altura: la columna ya se estira a la más alta; hago que la
+   tarjeta (wrapper + bloque con borde) llene esa altura en vez de quedarse corta. */
+div[data-testid="stColumn"] > div[data-testid="stVerticalBlock"] > div[data-testid="stLayoutWrapper"],
+div[data-testid="stColumn"] > div[data-testid="stVerticalBlock"] > div[data-testid="stLayoutWrapper"] > div[data-testid="stVerticalBlock"] {
+    height: 100% !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
