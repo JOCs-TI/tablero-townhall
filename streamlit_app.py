@@ -584,13 +584,18 @@ if pagina == "Venta Nueva":
     with col_b:
         st.subheader("VN acumulado vs PTO anual por área")
         areas_vn = [a for a in vnpto_area if vnpto_area[a] > 0 or vn_area.get(a, 0) > 0]
+        # % de avance (Real ÷ PTO) fijo sobre cada barra azul (Real).
+        avance_txt = [f"{vn_area.get(a, 0)/vnpto_area[a]*100:.0f}%" if vnpto_area.get(a) else ""
+                      for a in areas_vn]
         fig_c = go.Figure()
         fig_c.add_bar(name="PTO", x=areas_vn, y=[vnpto_area.get(a, 0) for a in areas_vn],
                       marker_color=COLOR_PTO)
         fig_c.add_bar(name="Real", x=areas_vn, y=[vn_area.get(a, 0) for a in areas_vn],
-                      marker_color=COLOR_2026)
+                      marker_color=COLOR_2026,
+                      text=avance_txt, textposition="outside",
+                      textfont=dict(size=11, color="#e0e0e0"), cliponaxis=False)
         fig_c.update_layout(barmode="group", height=380, yaxis_tickformat="$,.0f",
-                            margin=dict(t=20, b=20),
+                            margin=dict(t=30, b=20),
                             legend=dict(orientation="h", y=1.12))
         st.plotly_chart(fig_c, use_container_width=True)
 
