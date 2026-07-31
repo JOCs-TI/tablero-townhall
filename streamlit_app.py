@@ -1,3 +1,4 @@
+import warnings
 import openpyxl
 import pandas as pd
 import plotly.graph_objects as go
@@ -5,8 +6,10 @@ import streamlit as st
 import streamlit.components.v1 as components
 from pathlib import Path
 
+warnings.filterwarnings("ignore")
+
 st.set_page_config(
-    page_title="Town Hall 2026",
+    page_title="Consejo Ancora 2026",
     page_icon=None,
     layout="wide",
     initial_sidebar_state="expanded",
@@ -14,46 +17,35 @@ st.set_page_config(
 
 # Rutas relativas al propio archivo: funcionan igual en Windows y en Linux (la nube).
 BASE = Path(__file__).parent
-EXCEL_PATH = BASE / "EXCEL" / "Town Hall Julio 2026.xlsx"
-# Logo en negativo (marcas off-white, fondo transparente) para el sidebar navy.
+EXCEL_PATH = BASE / "EXCEL" / "Presentacion Consejo Junio 2026.xlsx"
 LOGO_PATH = BASE / "imagenes" / "ancora_blanco.png"
+
+# ── Paleta de marca Ancora ──────────────────────────────────────────────────────
+MARCA_NAVY  = "#13375c"
+MARCA_CLARO = "#F6F6F6"
+MARCA_TEAL  = "#1d7b8a"
+MARCA_ORO   = "#e9ba40"
+
+# Lineas de negocio (colores de marca extendidos).
+COLORES_LDN = {
+    "BENEFICIOS": MARCA_TEAL,
+    "LF":         MARCA_ORO,
+    "DAÑOS":      "#3a6ea5",
+    "FIANZAS":    "#d97b3c",
+    "LP":         "#4aa3b0",
+    "AUTOS":      "#8a6d4b",
+    "ANI":        "#b58fb0",
+    "AFFINITY":   "#9aa5b1",
+    "BONO":       "#6f9bc4",
+}
+COLOR_PTO  = MARCA_ORO   # dorado · meta/presupuesto
+COLOR_2026 = MARCA_TEAL  # teal · real (protagonista)
+COLOR_2025 = "#3a6ea5"   # navy acero · año anterior
+C_NEG = "#e05c5c"
+C_POS = MARCA_TEAL
 
 MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
          "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
-
-# Proyección de ingreso para el cierre del año 2026 (dato provisto, editable).
-PROY_ANUAL_2026 = 160_000_000
-
-# ── Paleta de marca Ancora ──────────────────────────────────────────────────────
-# Primarios: navy #13375c · off-white #F6F6F6 · teal #1d7b8a · dorado #e9ba40.
-MARCA_NAVY = "#13375c"
-MARCA_CLARO = "#F6F6F6"
-MARCA_TEAL = "#1d7b8a"
-MARCA_ORO = "#e9ba40"
-
-# Paleta categórica por área, anclada en los primarios de marca y extendida con
-# tonos armónicos para que las 9 áreas se distingan sobre fondo oscuro.
-COLORES = {
-    "BENEFICIOS":    MARCA_TEAL,   # teal (marca)
-    "LF":            MARCA_ORO,    # dorado (marca)
-    "DAÑOS":         "#3a6ea5",    # azul acero (navy aclarado)
-    "FIANZAS":       "#d97b3c",    # terracota (complementa el dorado)
-    "LP":            "#4aa3b0",    # teal claro
-    "AUTOS":         "#8a6d4b",    # bronce
-    "BONO":          "#6f9bc4",    # azul medio
-    "ANI":           "#b58fb0",    # malva
-    "AFFINITY":      "#9aa5b1",    # gris azulado (familia off-white)
-    "HONORARIOS":    "#c99a2e",    # dorado oscuro
-    "INTERNACIONAL": "#aec7e8",
-}
-# Series de comparación por año, en la familia de marca: gris (2024), navy acero
-# (2025), dorado = meta/PTO y teal = real 2026 (la línea protagonista).
-COLOR_2024 = "#9aa5b1"   # gris azulado · dotted
-COLOR_2025 = "#3a6ea5"   # navy acero · dashed
-COLOR_PTO  = MARCA_ORO   # dorado · dashdot (línea de meta)
-COLOR_2026 = MARCA_TEAL  # teal · sólido (protagonista)
-C_NEG = "#e05c5c"        # rojo (semántico: por debajo)
-C_POS = MARCA_TEAL       # teal (semántico: a favor)
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 def fmt(v):
@@ -73,131 +65,133 @@ def pct(v):
     return f"{'+' if v >= 0 else ''}{v*100:.1f}%"
 
 def sf(v):
-    return float(v) if isinstance(v, (int, float)) else 0.0
+    return float(v) if isinstance(v, (int, float)) else None
 
 def norm(s):
     if not isinstance(s, str):
         return s
     return (s.replace("DA�OS", "DAÑOS").replace("DANOS", "DAÑOS")
-             .replace("�REA", "AREA").replace("�", "Ñ").strip())
+             .replace("L�neas", "Líneas").replace("�REA", "AREA")
+             .replace("�", "ñ").strip())
 
 # ── Carga ──────────────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner="Cargando datos...")
-def load_data():
-    """Lee los bloques por año buscando los encabezados 'AREA', no filas fijas."""
-    wb = openpyxl.load_workbook(EXCEL_PATH, data_only=True)
+def load_wb():
+    return openpyxl.load_workbook(EXCEL_PATH, data_only=True)
 
-    def etiqueta(txt):
-        s = str(txt).upper()
-        if "PTO" in s or "PRESUP" in s:
-            return "PTO"
-        for y in ("2026", "2025", "2024"):
-            if y in s:
-                return y
-        return None
+# Conceptos del P&L (General y LdN comparten casi el mismo orden).
+CONC_GENERAL = [
+    "Base LIne", "Base Line", "Bono", "Venta Nueva", "Ingresos",
+    "Costos de Referencia", "Utilidad Bruta", "Sueldos Directos", "Gastos Directos",
+    "Utilidad Operativa", "Gastos Indirectos", "Sueldos Corporativos",
+    "Sueldos Compartidos", "Utilidad",
+]
 
-    def leer_hoja(nombre):
-        ws = wb[nombre]
-        rows = list(ws.iter_rows(min_row=1, values_only=True))
-        bloques = {}
-        for i, r in enumerate(rows):
-            if not r or r[0] is None:
-                continue
-            if norm(str(r[0])).upper() not in ("AREA", "ÁREA"):
-                continue
-            # la etiqueta del bloque vive en la fila anterior
-            lab = None
-            for back in (1, 2):
-                if i - back >= 0 and rows[i - back] and rows[i - back][0] is not None:
-                    lab = etiqueta(rows[i - back][0])
-                    if lab:
-                        break
-            if not lab:
-                continue
-            datos = {}
-            for r2 in rows[i + 1:]:
-                if not r2 or r2[0] is None or not str(r2[0]).strip():
-                    continue
-                a = norm(str(r2[0])).upper()
-                if a == "TOTAL":
-                    break
-                datos[a] = [sf(r2[c]) for c in range(1, 13)]
-            if datos:
-                bloques[lab] = datos
-        return bloques
+def parse_general(wb):
+    """General: P&L acumulado al 2do trimestre (Ene-Jun), por concepto.
+    Columnas: B=PTO 2Q, D=Real 2Q, G=2025 2Q, J=PTO anual, M=2025 anual."""
+    ws = wb["General"]
+    cols = {"pto_2q": 2, "real_2q": 4, "y25_2q": 7, "pto_anual": 10, "y25_anual": 13}
+    data = {}
+    for r in range(4, 30):
+        c = norm(ws.cell(r, 1).value)
+        if not isinstance(c, str) or not c:
+            continue
+        data[c] = {k: sf(ws.cell(r, col).value) for k, col in cols.items()}
+    return data
 
-    ing = leer_hoja("Ingresos")
-    vn = leer_hoja("VN")
-    return ing, vn
+def parse_ldn(wb):
+    """LdN: 7 bloques en dos columnas (A y K), filas 2/29/56/82.
+    Dentro de cada bloque: col+1=PTO, col+3=Real, col+6=2025."""
+    ws = wb["LdN"]
+    bloques = {
+        "BENEFICIOS": (2, 1), "LF": (2, 11),
+        "FIANZAS": (29, 1), "AUTOS": (29, 11),
+        "DAÑOS": (56, 1), "LP": (56, 11),
+        "AFFINITY": (82, 1),
+    }
+    offsets = {"pto": 1, "real": 3, "y25": 6}
+    result = {}
+    for nombre, (r0, c0) in bloques.items():
+        blk = {}
+        for r in range(r0 + 1, r0 + 14):
+            cc = norm(ws.cell(r, c0).value)
+            if not isinstance(cc, str) or not cc or cc == "Concepto":
+                continue
+            blk[cc] = {k: sf(ws.cell(r, c0 + off).value) for k, off in offsets.items()}
+        result[nombre] = blk
+    return result
+
+def parse_ingresos(wb):
+    """Ingresos: secciones mensuales por area (INGRESOS BRUTOS 2026, VN, PTO)."""
+    ws = wb["Ingresos"]
+    rows = list(ws.iter_rows(min_row=1, values_only=True))
+    areas = ["AFFINITY", "ANI", "AUTOS", "BENEFICIOS", "DAÑOS",
+             "INTERNACIONAL", "FIANZAS", "LF", "LP", "BONO"]
+
+    def val(v):
+        return float(v) if isinstance(v, (int, float)) else 0.0
+
+    result = {"2026": {}, "2025": {}, "ppto_2026": {}}
+    section = None
+    pend_2025 = False   # el bloque de ingresos 2025 no trae rótulo de año:
+                        # viene justo después de "COSTOS DE REFERENCIA 2025 REAL".
+    for row in rows:
+        c0 = norm(row[0]) if row[0] is not None else None
+        c1 = norm(row[1]) if len(row) > 1 and row[1] is not None else None
+        if c1 == "INGRESOS BRUTOS 2026":
+            section = "2026"; continue
+        if isinstance(c0, str) and "COSTOS DE REFERENCIA 2025" in c0.upper():
+            section = None; pend_2025 = True; continue
+        if isinstance(c0, str) and c0.upper() == "AREA" and pend_2025:
+            section = "2025"; pend_2025 = False; continue
+        if isinstance(c0, str) and "BASE LINE PRESUPUESTO 2026" in c0.upper():
+            section = "ppto_2026"; continue
+        if c1 in ("INGRESOS BRUTOS 2026 VENTA NUEVA", "VENTA NUEVA 2025",
+                  "VENTA NUEVA PRESUPUESTO 2026") or \
+           (isinstance(c1, str) and "VENTA N" in c1.upper()):
+            section = None; continue
+        if isinstance(c0, str) and c0.upper() in [a.upper() for a in areas] and section:
+            vals = [val(row[i]) for i in range(1, 13)]
+            key = c0.upper()
+            if key not in result[section]:
+                result[section][key] = vals
+            else:
+                result[section][key] = [a + b for a, b in zip(result[section][key], vals)]
+    return result
 
 try:
-    ING, VN = load_data()
+    wb = load_wb()
+    GEN = parse_general(wb)
+    LDN = parse_ldn(wb)
+    ING = parse_ingresos(wb)
 except Exception as e:
-    st.error(f"Error al abrir el archivo: {e}")
+    st.error(f"Error al abrir el archivo:\n\n`{EXCEL_PATH}`\n\n{e}")
     st.stop()
 
-if not ING:
-    st.error(f"No se encontraron bloques de datos en el archivo:\n\n`{EXCEL_PATH}`")
-    st.stop()
+def g(concepto, campo):
+    return GEN.get(concepto, {}).get(campo)
 
-# Áreas excluidas de todo el tablero.
-EXCLUIR_AREAS = {"INTERNACIONAL", "ANI"}
-for _grupo in (ING, VN):
-    for _bloque in _grupo.values():
-        for _a in list(_bloque):
-            if _a in EXCLUIR_AREAS:
-                del _bloque[_a]
+# Ingresos usa 'Base LIne' (con el typo del Excel) en General.
+BASE_KEY = "Base LIne" if "Base LIne" in GEN else "Base Line"
 
-def meses_con_datos(bloque):
-    """Ultimo mes con dato real (para comparar YTD contra el mismo periodo)."""
-    if not bloque:
-        return 0
-    ult = 0
-    for m in range(12):
-        if sum(v[m] for v in bloque.values()) > 0:
-            ult = m + 1
-    return ult
+# AFFINITY se excluye (viene en $0 en el archivo de junio).
+LDN_LIST = ["BENEFICIOS", "LF", "FIANZAS", "AUTOS", "DAÑOS", "LP"]
 
-N_MES = meses_con_datos(ING.get("2026", {}))
-PERIODO = f"{MESES[0]}–{MESES[N_MES-1]}" if N_MES else "sin datos"
-
-def total(bloque, hasta=12):
-    return sum(sum(v[:hasta]) for v in bloque.values())
-
-def por_area(bloque, hasta=12):
-    return {a: sum(v[:hasta]) for a, v in bloque.items()}
-
-def serie_mensual(bloque, areas=None):
-    ms = [0.0] * 12
-    for a, v in bloque.items():
-        if areas is not None and a not in areas:
-            continue
-        for m in range(12):
-            ms[m] += v[m]
-    return ms
-
-# ── Estilos (mismos que los otros tableros) ────────────────────────────────────
+# ── Estilos (marca Ancora) ──────────────────────────────────────────────────────
 st.markdown("""
 <style>
-/* Fuente de marca Ancora: Montserrat. El @import debe ir primero en el <style>. */
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
-/* Montserrat en todo EXCEPTO los iconos Material, que llevan su propia fuente. */
 html, body, [data-testid="stAppViewContainer"], [data-testid="stSidebar"], .stApp,
-.stApp *:not([data-testid="stIconMaterial"]) {
-    font-family: 'Montserrat', sans-serif !important;
-}
+.stApp *:not([data-testid="stIconMaterial"]) { font-family: 'Montserrat', sans-serif !important; }
 [data-testid="stIconMaterial"] { font-family: 'Material Symbols Rounded' !important; }
-/* Cuerpo sobre fondo oscuro: Medium (500). */
 [data-testid="stAppViewContainer"], [data-testid="stMarkdownContainer"],
 p, span:not([data-testid="stIconMaterial"]), label, td, th, li,
-div[data-testid="stMetricValue"], div[data-testid="stMetricDelta"], .stDataFrame { font-weight: 500; }
-/* Títulos: Semibold (600). */
+div[data-testid="stMetricValue"], div[data-testid="stMetricDelta"] { font-weight: 500; }
 h1, h2, h3, h4, h5, h6, div[data-testid="stMetricLabel"] p { font-weight: 600 !important; }
-
 section[data-testid="stSidebar"] img { pointer-events: none; }
 section[data-testid="stSidebar"] [data-testid="StyledFullScreenButton"] { display: none; }
 section[data-testid="stSidebar"] > div:first-child { padding-top: 0 !important; }
-section[data-testid="stSidebar"] .block-container { padding-top: 0 !important; }
 div[data-testid="stRadio"] > div { gap: 2px !important; }
 div[data-testid="stRadio"] label {
     display: flex !important; align-items: center !important;
@@ -211,22 +205,10 @@ div[data-testid="stRadio"] label:has(input:checked) {
 }
 div[data-testid="stRadio"] label > div:first-child { display: none !important; }
 div[data-testid="stRadio"] { border: none !important; }
-/* Montos exactos son largos: fuente menor y sin corte para que quepan completos. */
-div[data-testid="stMetricValue"] {
-    font-size: 1.35rem !important; line-height: 1.2 !important;
-    white-space: nowrap !important; overflow: visible !important;
-}
-div[data-testid="stMetricValue"] > div { overflow: visible !important; }
-/* Tarjetas de la misma altura: la columna ya se estira a la más alta; hago que la
-   tarjeta (wrapper + bloque con borde) llene esa altura en vez de quedarse corta. */
-div[data-testid="stColumn"] > div[data-testid="stVerticalBlock"] > div[data-testid="stLayoutWrapper"],
-div[data-testid="stColumn"] > div[data-testid="stVerticalBlock"] > div[data-testid="stLayoutWrapper"] > div[data-testid="stVerticalBlock"] {
-    height: 100% !important;
-}
 </style>
 """, unsafe_allow_html=True)
 
-# Evita que el traductor del navegador reformatee los montos ("$18.6M" -> "18,6 millones").
+# Evita que el traductor del navegador reformatee los montos.
 components.html(
     "<script>try{var d=window.parent.document.documentElement;"
     "d.setAttribute('translate','no');d.classList.add('notranslate');}catch(e){}</script>",
@@ -240,374 +222,400 @@ with st.sidebar:
     st.caption("TABLEROS")
     pagina = st.radio(
         "",
-        ["Panorama", "Ingreso Semestral", "Venta Nueva"],
+        ["Resumen", "Por Línea de Negocio"],
         label_visibility="collapsed",
         key="nav",
     )
     st.markdown("---")
-    st.caption(f"Town Hall · Datos a {MESES[N_MES-1] if N_MES else '—'} 2026")
+    st.caption("Consejo Ancora · Cierre 2T 2026 (Ene–Jun)")
 
-# ── Series base ────────────────────────────────────────────────────────────────
-B26, B25, B24, BPTO = ING.get("2026", {}), ING.get("2025", {}), ING.get("2024", {}), ING.get("PTO", {})
-V26, V25, V24, VPTO = VN.get("2026", {}), VN.get("2025", {}), VN.get("2024", {}), VN.get("PTO", {})
+# HTML de tabla P&L (tema navy de marca).
+PL_CSS = f"""
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{font-family:'Montserrat',-apple-system,'Segoe UI',sans-serif;background:transparent;
+color:{MARCA_CLARO};font-size:13px;font-weight:500}}
+table{{width:100%;border-collapse:collapse}}
+th{{padding:8px 12px;text-align:right;border-bottom:2px solid #2e4d70;color:#9db3cc;
+font-weight:600;font-size:12px;white-space:nowrap}}
+th:first-child{{text-align:left}}
+td{{padding:7px 12px;text-align:right;border-bottom:1px solid #21344c;white-space:nowrap}}
+td:first-child{{text-align:left}}
+.main td{{font-weight:700}}
+.sub{{display:none}}
+.sub td{{font-size:12px;color:#a9bad0;font-weight:400}}
+.sc{{padding-left:30px!important}}
+.clk{{cursor:pointer}}
+.clk:hover td{{background:rgba(255,255,255,.06)}}
+.sub:hover td{{background:rgba(255,255,255,.03)}}
+.neg{{color:{C_NEG}}}.pos{{color:{MARCA_TEAL}}}
+.arr{{font-size:9px;color:#9db3cc;display:inline-block;width:12px;text-align:center}}
+"""
+PL_JS = """
+function tgl(row){
+  var gid=row.getAttribute('data-g');
+  var subs=document.querySelectorAll('.sub-'+gid);
+  var arr=document.getElementById('a-'+gid);
+  var open=arr.textContent==='▼';
+  subs.forEach(function(s){s.style.display=open?'none':'table-row'});
+  arr.textContent=open?'►':'▼';
+}
+"""
 
-# Comparaciones contra años completos: lo acumulado de 2026 se mide contra el
-# total anual de 2025, 2024 y el presupuesto. Es la vista de "avance del año".
-ING_2026  = total(B26)
-ING_2025  = total(B25)
-ING_2024  = total(B24)
-PTO_ANUAL = total(BPTO)
-
-AREAS = sorted(
-    {a for b in (B26, B25, B24, BPTO) for a in b},
-    key=lambda a: -sum(B26.get(a, [0]*12)[:N_MES] or [0]),
-)
+st.title("Tablero Ejecutivo Ancora · 2T 2026")
+st.caption("Acumulado al segundo trimestre (Ene–Jun) · Importes en MXN")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PANORAMA
+# RESUMEN
 # ══════════════════════════════════════════════════════════════════════════════
-if pagina == "Panorama":
-    st.title("Town Hall · 2026")
-    st.caption("Ingresos y venta nueva por área · Comparativo contra años completos · Importes en MXN")
-
-    if N_MES < 12:
-        st.info(f"2026 lleva **{N_MES} de 12 meses** ({PERIODO}). El crecimiento de 2026 se mide "
-                f"contra el **mismo periodo** de 2025 ({PERIODO}); el de 2025 es año completo vs 2024.")
-
-    # Crecimiento: 2025 completo vs 2024 completo; 2026 (parcial) vs el mismo periodo de 2025.
-    ing_25_ytd = total(B25, N_MES)
-    g_ing_25 = ING_2025 / ING_2024 - 1 if ING_2024 else None
-    g_ing_26 = ING_2026 / ing_25_ytd - 1 if ing_25_ytd else None
-    vn_24, vn_25, vn_26 = total(V24), total(V25), total(V26)
-    vn_25_ytd = total(V25, N_MES)
-    g_vn_25 = vn_25 / vn_24 - 1 if vn_24 else None
-    g_vn_26 = vn_26 / vn_25_ytd - 1 if vn_25_ytd else None
-
-    g2024, g2025, g2026 = st.columns(3)
-
-    with g2024:
-        with st.container(border=True):
-            st.markdown("##### 2024")
-            a, b = st.columns(2)
-            a.metric("Ingreso", fmt_m(ING_2024),
-                     delta="año completo", delta_color="off")
-            b.metric("Venta Nueva", fmt_m(vn_24),
-                     delta="año completo", delta_color="off")
-
-    with g2025:
-        with st.container(border=True):
-            st.markdown("##### 2025")
-            a, b = st.columns(2)
-            a.metric("Ingreso", fmt_m(ING_2025),
-                     delta=f"{pct(g_ing_25)} vs 2024" if g_ing_25 is not None else None)
-            b.metric("Venta Nueva", fmt_m(vn_25),
-                     delta=f"{pct(g_vn_25)} vs 2024" if g_vn_25 is not None else None)
-
-    with g2026:
-        with st.container(border=True):
-            st.markdown(f"##### 2026 · {N_MES} de 12 meses")
-            a, b = st.columns(2)
-            a.metric("Ingreso", fmt_m(ING_2026),
-                     delta=f"{pct(g_ing_26)} vs 2025 (mismo periodo)" if g_ing_26 is not None else None)
-            b.metric("Venta Nueva", fmt_m(vn_26),
-                     delta=f"{pct(g_vn_26)} vs 2025 (mismo periodo)" if g_vn_26 is not None else None)
-            st.caption(f"Proyección de ingreso al cierre del año: **{fmt(PROY_ANUAL_2026)}**")
+if pagina == "Resumen":
+    ingreso_real = g("Ingresos", "real_2q")
+    kpis = [
+        ("Ingresos", "Ingresos"),
+        ("Utilidad Bruta", "Utilidad Bruta"),
+        ("Utilidad Operativa", "Utilidad Operativa"),
+        ("EBITDA", "Utilidad"),
+    ]
+    cols = st.columns(4)
+    for col, (label, key) in zip(cols, kpis):
+        real, ptov, y25 = g(key, "real_2q"), g(key, "pto_2q"), g(key, "y25_2q")
+        d25 = (real / y25 - 1) if real and y25 else None
+        margen = (real / ingreso_real) if (real and ingreso_real and key != "Ingresos") else None
+        with col:
+            st.metric(label, fmt_m(real),
+                      delta=(f"Margen {pct(margen)}" if margen is not None else None),
+                      delta_color="off")
+            st.caption(f"PTO: {fmt_m(ptov)}  |  2025: {fmt_m(y25)}  ({pct(d25)} vs 2025)")
 
     st.divider()
-    st.subheader("Ingreso mensual: 2026 vs 2025 vs 2024")
+    st.subheader("PTO vs Real vs 2025 — Indicadores clave")
+    keys = ["Ingresos", "Utilidad Bruta", "Utilidad Operativa", "Utilidad"]
+    labels = ["Ingresos", "Util. Bruta", "Util. Operativa", "EBITDA"]
     fig = go.Figure()
-    for nombre, bloque, color, dash in [
-        ("2024", B24, COLOR_2024, "dot"),
-        ("2025", B25, COLOR_2025, "dash"),
-        ("PTO 2026", BPTO, COLOR_PTO, "dashdot"),
-    ]:
-        if bloque:
-            fig.add_scatter(name=nombre, x=MESES, y=serie_mensual(bloque),
-                            mode="lines+markers",
-                            line=dict(color=color, width=2, dash=dash))
-    if B26:
-        s26 = serie_mensual(B26)[:N_MES]
-        fig.add_scatter(name="Real 2026", x=MESES[:N_MES], y=s26,
-                        mode="lines+markers",
-                        line=dict(color=COLOR_2026, width=4))
-    fig.update_layout(yaxis_tickformat="$,.0f", height=430,
-                      margin=dict(t=30, b=20),
-                      legend=dict(orientation="h", y=1.1))
+    for name, field, color in [("PTO 2Q", "pto_2q", COLOR_PTO),
+                               ("Real 2Q", "real_2q", COLOR_2026),
+                               ("2025 2Q", "y25_2q", COLOR_2025)]:
+        vals = [g(k, field) or 0 for k in keys]
+        ing = g("Ingresos", field) or 0
+        # Cifra exacta + % de margen (de cada utilidad sobre ingresos).
+        txt = [fmt(v) if i == 0 else f"{fmt(v)}<br>{pct(v/ing) if ing else '—'}"
+               for i, v in enumerate(vals)]
+        fig.add_bar(name=name, x=labels, y=vals, marker_color=color,
+                    text=txt, textposition="outside",
+                    textfont=dict(size=10, color="#e0e0e0"), cliponaxis=False)
+    # % de crecimiento vs 2025 en medio de la barra Real 2Q (barra central del grupo).
+    for lab, k in zip(labels, keys):
+        r, q = g(k, "real_2q"), g(k, "y25_2q")
+        if r and q:
+            fig.add_annotation(x=lab, y=r / 2, text=pct(r / q - 1), showarrow=False,
+                               font=dict(size=13, color="#ffffff"),
+                               bgcolor="rgba(15,33,55,0.6)", borderpad=3)
+    fig.update_layout(barmode="group", yaxis_tickformat="$,.0f",
+                      legend=dict(orientation="h", y=1.12),
+                      uniformtext=dict(minsize=7, mode="hide"),
+                      height=500, margin=dict(t=80, b=20))
     st.plotly_chart(fig, use_container_width=True)
 
     st.divider()
-    col_mix1, col_mix2 = st.columns(2)
-    with col_mix1:
-        st.subheader(f"Mix de ingreso 2026 ({N_MES}m)")
-        vals = {a: v for a, v in por_area(B26, N_MES).items() if v > 0}
+    st.subheader("Estado de Resultados · Acumulado 2T 2026")
+
+    grupos = [
+        ("ing", "Ingresos Totales", "Ingresos", [
+            ("Base Line", BASE_KEY), ("Bono", "Bono"), ("Venta Nueva", "Venta Nueva")]),
+        (None, "Costos de Referencia", "Costos de Referencia", []),
+        ("ub", "Utilidad Bruta", "Utilidad Bruta", [
+            ("Sueldos Directos", "Sueldos Directos"), ("Gastos Directos", "Gastos Directos")]),
+        ("uo", "Utilidad Operativa", "Utilidad Operativa", [
+            ("Gastos Indirectos", "Gastos Indirectos"),
+            ("Sueldos Corporativos", "Sueldos Corporativos"),
+            ("Sueldos Compartidos", "Sueldos Compartidos")]),
+        (None, "EBITDA", "Utilidad", []),
+    ]
+
+    # Ingresos de referencia (por columna) para el % de integración.
+    ing_p = g("Ingresos", "pto_2q") or 0
+    ing_r = g("Ingresos", "real_2q") or 0
+    ing_q = g("Ingresos", "y25_2q") or 0
+
+    def _int(v, base):
+        return f"{v/base*100:.1f}%" if (v is not None and base) else "—"
+
+    def rv(key):
+        r, p, q = g(key, "real_2q"), g(key, "pto_2q"), g(key, "y25_2q")
+        return (fmt(p), _int(p, ing_p), fmt(r), _int(r, ing_r),
+                pct((r / p - 1) if r and p else None),
+                fmt(q), _int(q, ing_q),
+                pct((r / q - 1) if r and q else None))
+
+    def cc(v):
+        if v == "—":
+            return ""
+        return "neg" if v.startswith("-") else "pos"
+
+    def fila(label, key, gid=None, sub=False):
+        pv, pi, rvv, ri, vp, qv, qi, v25 = rv(key)
+        cls = f"sub sub-{gid}" if sub else ("main clk" if gid else "main")
+        clk = f' data-g="{gid}" onclick="tgl(this)"' if (gid and not sub) else ""
+        first = (f'<span class="arr" id="a-{gid}">►</span> {label}' if (gid and not sub)
+                 else label)
+        c1 = "sc" if sub else ""
+        return (f'<tr class="{cls}"{clk}><td class="{c1}">{first}</td>'
+                f'<td>{pv}</td><td class="pi">{pi}</td>'
+                f'<td>{rvv}</td><td class="pi">{ri}</td>'
+                f'<td class="{cc(vp)}">{vp}</td>'
+                f'<td>{qv}</td><td class="pi">{qi}</td>'
+                f'<td class="{cc(v25)}">{v25}</td></tr>')
+
+    body = ""
+    for gid, label, key, subs in grupos:
+        for sl, sk in subs:
+            body += fila(sl, sk, gid=gid, sub=True)
+        body += fila(label, key, gid=gid)
+
+    html = (f'<!DOCTYPE html><html><head><meta charset="utf-8"><style>{PL_CSS}'
+            f'.pi{{color:#9db3cc;font-size:11px}}</style></head>'
+            f'<body><table><thead><tr>'
+            f'<th>Concepto</th><th>PTO 2Q</th><th>% Int</th>'
+            f'<th>Real 2Q</th><th>% Int</th><th>vs PTO</th>'
+            f'<th>2025 2Q</th><th>% Int</th><th>vs 2025</th></tr></thead>'
+            f'<tbody>{body}</tbody></table><script>{PL_JS}</script></body></html>')
+    components.html(html, height=430, scrolling=False)
+    st.caption("Da clic en un renglón principal para ver su desglose. "
+               "% Int = cada concepto como porcentaje de los ingresos.")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# POR LÍNEA DE NEGOCIO
+# ══════════════════════════════════════════════════════════════════════════════
+if pagina == "Por Línea de Negocio":
+    st.subheader("Comparativo por Línea de Negocio · 2T 2026")
+
+    def lv(ldn, concepto, campo):
+        return LDN.get(ldn, {}).get(concepto, {}).get(campo) or 0
+
+    total_ing = sum(lv(l, "Ingresos", "real") for l in LDN_LIST)
+    # Carrusel: 3 tarjetas a la vez, con flechas para ver las demas.
+    PER_PAGE = 3
+    total_pages = -(-len(LDN_LIST) // PER_PAGE)  # division techo
+    if "ldn_page" not in st.session_state:
+        st.session_state.ldn_page = 0
+    page = max(0, min(st.session_state.ldn_page, total_pages - 1))
+    fila = LDN_LIST[page * PER_PAGE:(page + 1) * PER_PAGE]
+
+    cols = st.columns(3)
+    for col, l in zip(cols, fila):
+        real = lv(l, "Ingresos", "real")
+        ptov = lv(l, "Ingresos", "pto")
+        y25 = lv(l, "Ingresos", "y25")
+        d25 = (real / y25 - 1) if real and y25 else None
+        margen = (real / total_ing) if real and total_ing else None
+        with col:
+            st.metric(l, fmt_m(real),
+                      delta=(f"{margen*100:.1f}% del total" if margen is not None else None),
+                      delta_color="off")
+            st.caption(f"PTO {fmt_m(ptov)} · {pct(d25)} vs 25")
+
+    c_prev, c_ind, c_next = st.columns([1, 4, 1])
+    with c_prev:
+        if st.button("← Anterior", disabled=(page == 0), use_container_width=True):
+            st.session_state.ldn_page = page - 1
+            st.rerun()
+    with c_ind:
+        st.markdown(f"<div style='text-align:center;color:#9db3cc;font-size:13px;"
+                    f"padding-top:8px'>Página {page + 1} de {total_pages}</div>",
+                    unsafe_allow_html=True)
+    with c_next:
+        if st.button("Siguiente →", disabled=(page >= total_pages - 1),
+                     use_container_width=True):
+            st.session_state.ldn_page = page + 1
+            st.rerun()
+
+    st.divider()
+    st.subheader("Ingreso por área · primer semestre: 2025, 2026 y presupuesto")
+    _areas_i = ["BENEFICIOS", "FIANZAS", "DAÑOS", "LF", "AUTOS", "LP", "ANI", "BONO"]
+
+    def _ser(bloque, a):
+        return ING.get(bloque, {}).get(a, [0] * 12)
+
+    _nm = 0
+    for m in range(12):
+        if sum(_ser("2026", a)[m] for a in _areas_i) > 0:
+            _nm = m + 1
+    r26 = {a: sum(_ser("2026", a)[:_nm]) for a in _areas_i}
+    r25 = {a: sum(_ser("2025", a)[:_nm]) for a in _areas_i}
+    pp = {a: sum(_ser("ppto_2026", a)[:_nm]) for a in _areas_i}
+    ao = sorted([a for a in _areas_i if r26.get(a, 0) or r25.get(a, 0)],
+                key=lambda a: -r26.get(a, 0))
+    # 2026: crecimiento vs 2025. PTO: avance (Real 2026 ÷ PTO del semestre).
+    crec = [f"{r26[a]/r25[a]*100-100:+.0f}%" if r25.get(a) else "" for a in ao]
+    avance = [f"av. {r26[a]/pp[a]*100:.0f}%" if pp.get(a) else "" for a in ao]
+    fig_sem = go.Figure()
+    fig_sem.add_bar(name="1er sem 2025", x=ao, y=[r25.get(a, 0) for a in ao],
+                    marker_color=COLOR_2025)
+    fig_sem.add_bar(name="1er sem 2026", x=ao, y=[r26.get(a, 0) for a in ao],
+                    marker_color=COLOR_2026, text=crec, textposition="outside",
+                    textfont=dict(size=10, color="#e0e0e0"), cliponaxis=False)
+    fig_sem.add_bar(name="PTO 2026", x=ao, y=[pp.get(a, 0) for a in ao],
+                    marker_color=COLOR_PTO, text=avance, textposition="outside",
+                    textfont=dict(size=10, color="#e0e0e0"), cliponaxis=False)
+    fig_sem.update_layout(barmode="group", yaxis_tickformat="$,.0f", height=470,
+                          margin=dict(t=50, b=20), legend=dict(orientation="h", y=1.1))
+    st.plotly_chart(fig_sem, use_container_width=True)
+
+    st.divider()
+    st.subheader("Ingresos (barras) y Utilidad Operativa (línea) por LdN")
+    st.caption("Los 3 periodos a la vez · barras = Ingresos, líneas = Utilidad Operativa · "
+               "2025, Real 2026 y PTO, en la misma escala")
+    fig = go.Figure()
+    for etq, fld, color in [("Ing. 2025", "y25", COLOR_2025),
+                            ("Ing. Real 2026", "real", COLOR_2026),
+                            ("Ing. PTO", "pto", COLOR_PTO)]:
+        fig.add_bar(name=etq, x=LDN_LIST,
+                    y=[lv(l, "Ingresos", fld) for l in LDN_LIST], marker_color=color)
+    # Colores de línea distintos a los de las barras para que contrasten.
+    for etq, fld, color, dash, w in [("U.Op 2025", "y25", "#aab7c4", "dot", 2),
+                                     ("U.Op Real 2026", "real", "#ff7a5c", None, 4),
+                                     ("U.Op PTO", "pto", "#f2f2f2", "dash", 2.5)]:
+        fig.add_scatter(name=etq, x=LDN_LIST,
+                        y=[lv(l, "Utilidad Operativa", fld) for l in LDN_LIST],
+                        mode="lines+markers", line=dict(color=color, width=w, dash=dash),
+                        marker=dict(size=7, line=dict(width=1, color="#0f2137")))
+    fig.update_layout(barmode="group", height=520, margin=dict(t=50, b=10),
+                      legend=dict(orientation="h", y=1.14),
+                      yaxis=dict(title="MXN", tickformat="$,.0f"))
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.divider()
+    # Selector: controla el Mix y la tabla de abajo.
+    YEAR_OPTS = {"Real 2026": "real", "PTO 2026": "pto", "2025": "y25"}
+    year_sel = st.radio("Año para el Mix y la tabla",
+                        list(YEAR_OPTS.keys()), horizontal=True, key="ldn_year")
+    field = YEAR_OPTS[year_sel]
+    cp, ct = st.columns([2, 3])
+    with cp:
+        st.subheader(f"Mix de Ingresos · {year_sel}")
+        vals = {l: lv(l, "Ingresos", field) for l in LDN_LIST if lv(l, "Ingresos", field) > 0}
         fig_p = go.Figure(go.Pie(
             labels=list(vals.keys()), values=list(vals.values()),
-            marker_colors=[COLORES.get(a, "#999") for a in vals],
-            hole=0.42, textinfo="label+percent", sort=True,
-        ))
-        fig_p.update_layout(height=460, margin=dict(t=20, b=20), showlegend=False)
+            marker_colors=[COLORES_LDN.get(l, "#999") for l in vals],
+            hole=0.42, textinfo="label+percent", sort=True))
+        fig_p.update_layout(height=340, margin=dict(t=20, b=10), showlegend=False)
         st.plotly_chart(fig_p, use_container_width=True)
-    with col_mix2:
-        st.subheader("Mix de presupuesto 2026")
-        vals_pto = {a: v for a, v in por_area(BPTO).items() if v > 0}
-        fig_ppto = go.Figure(go.Pie(
-            labels=list(vals_pto.keys()), values=list(vals_pto.values()),
-            marker_colors=[COLORES.get(a, "#999") for a in vals_pto],
-            hole=0.42, textinfo="label+percent", sort=True,
-        ))
-        fig_ppto.update_layout(height=460, margin=dict(t=20, b=20), showlegend=False)
-        st.plotly_chart(fig_ppto, use_container_width=True)
+    with ct:
+        st.subheader(f"Tabla resumen por LdN · {year_sel}")
+        conceptos = ["Ingresos", "Utilidad Bruta", "Utilidad Operativa"]
+        # Total por concepto (del año seleccionado) para el % de integración.
+        totales = {c: sum(lv(l, c, field) for l in LDN_LIST) for c in conceptos}
+        rows = []
+        for l in LDN_LIST:
+            row = {"LdN": l}
+            for c in conceptos:
+                val = lv(l, c, field)
+                ptov = lv(l, c, "pto")
+                row[c] = fmt(val)
+                # % de integración: cuánto representa esta LdN del total del concepto.
+                row[f"{c} % Int"] = f"{val/totales[c]*100:.1f}%" if totales[c] else "—"
+                # vs PTO solo aplica al Real 2026 (no se compara 2025 ni el PTO contra sí mismo).
+                row[f"{c} vs PTO"] = pct((val / ptov - 1) if ptov else None) if field == "real" else "—"
+            # Rentabilidad = Utilidad Operativa ÷ Ingresos de esa línea.
+            ing_l = lv(l, "Ingresos", field)
+            row["Rentabilidad"] = f"{lv(l, 'Utilidad Operativa', field)/ing_l*100:.1f}%" if ing_l else "—"
+            rows.append(row)
+        # LdN como índice: st.dataframe la deja fija al hacer scroll horizontal.
+        st.dataframe(pd.DataFrame(rows).set_index("LdN"), use_container_width=True)
 
     st.divider()
-    st.subheader("Por área: 2024 vs 2025 vs PTO 2026 vs Real 2026")
-    st.caption(f"2024 y 2025 son año completo y PTO 2026 es el presupuesto anual; "
-               f"Real 2026 es lo acumulado ({PERIODO}, {N_MES} de 12 meses).")
-    a24, a25, apto, areal = por_area(B24), por_area(B25), por_area(BPTO), por_area(B26)
-    areas_y = sorted(
-        [a for a in AREAS if any(d.get(a, 0) > 0 for d in (a24, a25, apto, areal))],
-        key=lambda a: -apto.get(a, 0),
-    )
-    a25_ytd = por_area(B25, N_MES)   # 2025 al mismo periodo que el Real (para su crecimiento)
+    st.subheader("Detalle mensual")
+    areas_ing = ["BENEFICIOS", "FIANZAS", "DAÑOS", "LF", "AUTOS", "LP", "ANI", "BONO"]
 
-    def _crece(nuevo, viejo, suf):
-        """Sufijo con el % de crecimiento vs el año/periodo de referencia."""
-        if not viejo:
-            return ""
-        g = nuevo / viejo - 1
-        return f" · {'+' if g >= 0 else ''}{g*100:.0f}% {suf}"
+    def _serie(a):
+        return ING.get("2026", {}).get(a, [0] * 12)
 
-    def _texto_real(a):
-        """Monto real + crecimiento vs 2025 (mismo periodo) + % que falta al PTO."""
-        real, pto = areal.get(a, 0), apto.get(a, 0)
-        txt = fmt_m(real) + _crece(real, a25_ytd.get(a, 0), "vs 25")
-        if pto > 0:
-            falta = (pto - real) / pto
-            txt += " · meta cumplida" if falta <= 0 else f" · falta {falta*100:.0f}% PTO"
-        return txt
-
-    # (etiqueta, datos, color, referencia_para_crecimiento, sufijo)
-    series = [("2024", a24, COLOR_2024, None, ""),
-              ("2025", a25, COLOR_2025, a24, "vs 24"),
-              ("PTO 2026", apto, COLOR_PTO, a25, "vs 25"),
-              (f"Real 2026 ({N_MES}m)", areal, COLOR_2026, None, "")]
-
-    fig_cmp = go.Figure()
-    for etq, d, col, ref, suf in series:
-        es_real = d is areal
-        if es_real:
-            textos = [_texto_real(a) for a in areas_y]
-        elif ref is not None:
-            textos = [fmt_m(d.get(a, 0)) + _crece(d.get(a, 0), ref.get(a, 0), suf)
-                      for a in areas_y]
-        else:  # 2024 es la base, sin crecimiento
-            textos = [fmt_m(d.get(a, 0)) for a in areas_y]
-        fig_cmp.add_bar(
-            name=etq, orientation="h", y=areas_y,
-            x=[d.get(a, 0) for a in areas_y], marker_color=col,
-            text=textos,
-            # El Real lleva su etiqueta fija por fuera; las demas por dentro.
-            textposition="outside" if es_real else "inside",
-            insidetextanchor="middle",
-            textfont=dict(size=10, color=("#e0e0e0" if es_real else "#111")),
-            cliponaxis=False,
-            constraintext="none" if es_real else "both",
-        )
-    fig_cmp.update_layout(barmode="group", height=760, xaxis_tickformat="$,.0f",
-                          yaxis=dict(autorange="reversed"),
-                          margin=dict(t=30, b=20, r=210),
-                          uniformtext=dict(minsize=8, mode="show"),
-                          legend=dict(orientation="h", y=1.06))
-    st.plotly_chart(fig_cmp, use_container_width=True)
-
-# ══════════════════════════════════════════════════════════════════════════════
-# INGRESOS MENSUAL
-# ══════════════════════════════════════════════════════════════════════════════
-if pagina == "Ingreso Semestral":
-    SEM = 6
-    def h1(bl, a):
-        return sum(bl.get(a, [0] * 12)[:SEM])
-
-    # (etiqueta, bloque, color, bloque del año anterior para el % de crecimiento)
-    series = [("1er sem 2024", B24, COLOR_2024, None),
-              ("1er sem 2025", B25, COLOR_2025, B24),
-              ("1er sem 2026", B26, COLOR_2026, B25)]
-    areas_sem = [a for a in AREAS
-                 if any(h1(bl, a) > 0 for _, bl, _, _ in series)]
-
-    # ── Carrusel de crecimiento por línea de negocio (de 2 en 2) ────────────────
-    st.subheader("Crecimiento por línea de negocio · 1er semestre")
-    PASO = 2
-    n = len(areas_sem)
-    total_pag = max(1, (n + PASO - 1) // PASO)
-    if "ing_pag" not in st.session_state:
-        st.session_state.ing_pag = 0
-
-    c_prev, c_lbl, c_next = st.columns([1, 6, 1])
-    if c_prev.button("◀", key="ing_prev", use_container_width=True):
-        st.session_state.ing_pag = (st.session_state.ing_pag - 1) % total_pag
-    if c_next.button("▶", key="ing_next", use_container_width=True):
-        st.session_state.ing_pag = (st.session_state.ing_pag + 1) % total_pag
-    pag = st.session_state.ing_pag % total_pag
-    c_lbl.markdown(
-        f"<div style='text-align:center;padding-top:8px;color:#9aa0a6'>"
-        f"Líneas {pag*PASO+1}–{min((pag+1)*PASO, n)} de {n}</div>",
-        unsafe_allow_html=True,
-    )
-
-    fila = st.columns(PASO)
-    for col, a in zip(fila, areas_sem[pag*PASO:(pag+1)*PASO]):
-        s24, s25, s26 = h1(B24, a), h1(B25, a), h1(B26, a)
-        with col, st.container(border=True):
-            st.markdown(f"##### {a}")
-            m1, m2, m3 = st.columns(3)
-            m1.metric("2024", fmt_m(s24))
-            m2.metric("2025 vs 24", fmt_m(s25),
-                      delta=pct(s25 / s24 - 1) if s24 > 0 else None)
-            m3.metric("2026 vs 25", fmt_m(s26),
-                      delta=pct(s26 / s25 - 1) if s25 > 0 else None)
-
-    st.divider()
-    st.subheader("Ingreso por área · primer semestre por año")
-    fig = go.Figure()
-    for etq, bl, col, prev in series:
-        y = [h1(bl, a) for a in areas_sem]
-        txt = None
-        if prev is not None:
-            txt = [pct(h1(bl, a) / h1(prev, a) - 1) if h1(prev, a) > 0 else ""
-                   for a in areas_sem]
-        fig.add_bar(name=etq, x=areas_sem, y=y, marker_color=col,
-                    text=txt, textposition="outside",
-                    textfont=dict(size=10), cliponaxis=False)
-    fig.update_layout(barmode="group", bargap=0.25, bargroupgap=0.05,
-                      yaxis_tickformat="$,.0f", height=460,
-                      margin=dict(t=50, b=20),
-                      legend=dict(orientation="h", y=1.12))
-    st.plotly_chart(fig, use_container_width=True)
-
-    st.divider()
-    st.subheader("Real 2026 vs Presupuesto anual por área")
-    st.caption(f"Real acumulado ({PERIODO}, {N_MES} de 12 meses) contra el presupuesto anual.")
-    real_a, pto_a = por_area(B26), por_area(BPTO)
-    areas_cmp = [a for a in AREAS if real_a.get(a, 0) > 0 or pto_a.get(a, 0) > 0]
-    fig_rp = go.Figure()
-    fig_rp.add_bar(name="PTO", x=areas_cmp, y=[pto_a.get(a, 0) for a in areas_cmp],
-                   marker_color=COLOR_PTO)
-    fig_rp.add_bar(name="Real", x=areas_cmp, y=[real_a.get(a, 0) for a in areas_cmp],
-                   marker_color=COLOR_2026)
-    fig_rp.update_layout(barmode="group", yaxis_tickformat="$,.0f", height=420,
-                         margin=dict(t=30, b=20),
-                         legend=dict(orientation="h", y=1.1))
-    st.plotly_chart(fig_rp, use_container_width=True)
-
-    # La tabla de detalle muestra el bloque 2026 Real.
-    año = "2026"
-    bloque = B26
-    hasta = N_MES
-    areas_b = [a for a in AREAS if a in bloque and sum(bloque[a]) > 0]
-
-    st.divider()
-    st.subheader(f"Detalle mensual 2026 · {PERIODO}")
+    n_mes = 0
+    for m in range(12):
+        if sum(_serie(a)[m] for a in areas_ing) > 0:
+            n_mes = m + 1
     filas = []
-    for a in areas_b:
+    for a in areas_ing:
+        s = _serie(a)
+        if sum(s) == 0:
+            continue
         fila = {"Área": a}
-        for m in range(hasta):
-            fila[MESES[m]] = fmt(bloque[a][m])
-        fila["Total"] = fmt(sum(bloque[a][:hasta]))
+        for m in range(n_mes):
+            fila[MESES[m]] = fmt(s[m])
+        fila["Total"] = fmt(sum(s[:n_mes]))
         filas.append(fila)
-    tot_fila = {"Área": "TOTAL"}
-    for m in range(hasta):
-        tot_fila[MESES[m]] = fmt(sum(bloque[a][m] for a in areas_b))
-    tot_fila["Total"] = fmt(sum(sum(bloque[a][:hasta]) for a in areas_b))
-    filas.append(tot_fila)
+    tot = {"Área": "TOTAL"}
+    for m in range(n_mes):
+        tot[MESES[m]] = fmt(sum(_serie(a)[m] for a in areas_ing))
+    tot["Total"] = fmt(sum(sum(_serie(a)[:n_mes]) for a in areas_ing))
+    filas.append(tot)
     st.dataframe(pd.DataFrame(filas), use_container_width=True, hide_index=True)
 
-# ══════════════════════════════════════════════════════════════════════════════
-# VENTA NUEVA
-# ══════════════════════════════════════════════════════════════════════════════
-if pagina == "Venta Nueva":
-    # Vars anuales que siguen usando la gráfica y la tabla de abajo.
-    vn_ytd = total(V26)
-    vnpto_anual = total(VPTO)
-    vn25, vn24 = total(V25), total(V24)
-
-    # Primer semestre (Ene–Jun) para las tarjetas.
-    SEM = 6
-    vs24, vs25 = total(V24, SEM), total(V25, SEM)
-    vspto, vsreal = total(VPTO, SEM), total(V26, SEM)
-    with st.container(border=True):
-        st.markdown("##### VENTA NUEVA · 1er semestre")
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("1er sem 2024", fmt_m(vs24))
-        c2.metric("2025 vs 24", fmt_m(vs25),
-                  delta=pct(vs25 / vs24 - 1) if vs24 else None)
-        c3.metric("Real 2026 vs 25", fmt_m(vsreal),
-                  delta=pct(vsreal / vs25 - 1) if vs25 else None)
-        c4.metric("PTO 2026", fmt_m(vspto),
-                  delta=f"avance {vsreal/vspto*100:.0f}% del real" if vspto else None,
-                  delta_color="off")
-
     st.divider()
-    st.subheader("Venta Nueva mensual")
-    fig = go.Figure()
-    for nombre, bloque, color, dash in [
-        ("2024", V24, COLOR_2024, "dot"),
-        ("2025", V25, COLOR_2025, "dash"),
-        ("PTO 2026", VPTO, COLOR_PTO, "dashdot"),
-    ]:
-        if bloque:
-            fig.add_scatter(name=nombre, x=MESES, y=serie_mensual(bloque),
-                            mode="lines+markers",
-                            line=dict(color=color, width=2, dash=dash))
-    if V26:
-        fig.add_scatter(name="Real 2026", x=MESES[:N_MES],
-                        y=serie_mensual(V26)[:N_MES],
-                        mode="lines+markers", line=dict(color=COLOR_2026, width=4))
-    fig.update_layout(yaxis_tickformat="$,.0f", height=420,
-                      margin=dict(t=30, b=20),
-                      legend=dict(orientation="h", y=1.1))
-    st.plotly_chart(fig, use_container_width=True)
+    st.subheader("Detalle por Línea de Negocio")
+    sel = st.selectbox("Selecciona una LdN", LDN_LIST)
+    d_sel = LDN.get(sel, {})
+    grupos = [
+        ("ing", "Ingresos", "Ingresos", [
+            ("Base Line", "Base Line"), ("Bono", "Bono "), ("Bono", "Bonos"),
+            ("Venta Nueva", "Venta Nueva")]),
+        (None, "Costos de Referencia", "Costos de Referencia", []),
+        ("ub", "Utilidad Bruta", "Utilidad Bruta", [
+            ("Sueldos Directos", "Sueldos Directos"), ("Gastos Directos", "Gastos Directos")]),
+        ("ud", "Utilidad Directa", "Utilidad Directa", [
+            ("Gastos Indirectos", "Gastos Indirectos"),
+            ("Sueldos Corporativos", "Sueldos Corporativos"),
+            ("Sueldos Compartidos", "Sueldos Compartidos")]),
+        (None, "Utilidad Operativa", "Utilidad Operativa", []),
+    ]
 
-    st.divider()
-    col_a, col_b = st.columns(2)
-    vn_area = {a: v for a, v in por_area(V26).items() if v > 0}
-    vnpto_area = por_area(VPTO)
-    with col_a:
-        st.subheader("VN por área · acumulado 2026")
-        fig_a = go.Figure(go.Bar(
-            x=list(vn_area.values()), y=list(vn_area.keys()), orientation="h",
-            marker_color=[COLORES.get(a, "#999") for a in vn_area],
-            text=[fmt_m(v) for v in vn_area.values()], textposition="auto",
-        ))
-        fig_a.update_layout(height=380, xaxis_tickformat="$,.0f",
-                            yaxis=dict(autorange="reversed"), margin=dict(t=20, b=20))
-        st.plotly_chart(fig_a, use_container_width=True)
-    with col_b:
-        st.subheader("VN acumulado vs PTO anual por área")
-        areas_vn = [a for a in vnpto_area if vnpto_area[a] > 0 or vn_area.get(a, 0) > 0]
-        # % de avance (Real ÷ PTO) fijo sobre cada barra azul (Real).
-        avance_txt = [f"{vn_area.get(a, 0)/vnpto_area[a]*100:.0f}%" if vnpto_area.get(a) else ""
-                      for a in areas_vn]
-        fig_c = go.Figure()
-        fig_c.add_bar(name="PTO", x=areas_vn, y=[vnpto_area.get(a, 0) for a in areas_vn],
-                      marker_color=COLOR_PTO)
-        fig_c.add_bar(name="Real", x=areas_vn, y=[vn_area.get(a, 0) for a in areas_vn],
-                      marker_color=COLOR_2026,
-                      text=avance_txt, textposition="outside",
-                      textfont=dict(size=11, color="#e0e0e0"), cliponaxis=False)
-        fig_c.update_layout(barmode="group", height=380, yaxis_tickformat="$,.0f",
-                            margin=dict(t=30, b=20),
-                            legend=dict(orientation="h", y=1.12))
-        st.plotly_chart(fig_c, use_container_width=True)
+    # Ingresos de la LdN (por columna) para el % de integración.
+    ing = d_sel.get("Ingresos", {})
+    ip, ir, iq = ing.get("pto") or 0, ing.get("real") or 0, ing.get("y25") or 0
 
-    filas = []
-    for a in sorted(set(vn_area) | set(k for k, v in vnpto_area.items() if v > 0),
-                    key=lambda x: -vn_area.get(x, 0)):
-        r, p = vn_area.get(a, 0), vnpto_area.get(a, 0)
-        filas.append({"Área": a, "Real acumulado": fmt(r), "PTO anual": fmt(p),
-                      "Falta": fmt(r - p),
-                      "Avance": pct(r/p) if p else "—"})
-    filas.append({"Área": "TOTAL", "Real acumulado": fmt(vn_ytd),
-                  "PTO anual": fmt(vnpto_anual),
-                  "Falta": fmt(vn_ytd - vnpto_anual),
-                  "Avance": pct(vn_ytd/vnpto_anual) if vnpto_anual else "—"})
-    st.dataframe(pd.DataFrame(filas), use_container_width=True, hide_index=True)
+    def _int(v, base):
+        return f"{v/base*100:.1f}%" if (v is not None and base) else "—"
+
+    def dv(key):
+        d = d_sel.get(key, {})
+        r, p, q = d.get("real"), d.get("pto"), d.get("y25")
+        return (fmt(p), _int(p, ip), fmt(r), _int(r, ir),
+                pct((r / p - 1) if r and p else None),
+                fmt(q), _int(q, iq),
+                pct((r / q - 1) if r and q else None))
+
+    def cc2(v):
+        if v == "—":
+            return ""
+        return "neg" if v.startswith("-") else "pos"
+
+    def fila2(label, key, gid=None, sub=False):
+        pv, pi, rvv, ri, vp, qv, qi, v25 = dv(key)
+        cls = f"sub sub-{gid}" if sub else ("main clk" if gid else "main")
+        clk = f' data-g="{gid}" onclick="tgl(this)"' if (gid and not sub) else ""
+        first = (f'<span class="arr" id="a-{gid}">►</span> {label}' if (gid and not sub)
+                 else label)
+        c1 = "sc" if sub else ""
+        return (f'<tr class="{cls}"{clk}><td class="{c1}">{first}</td>'
+                f'<td>{pv}</td><td class="pi">{pi}</td>'
+                f'<td>{rvv}</td><td class="pi">{ri}</td>'
+                f'<td class="{cc2(vp)}">{vp}</td>'
+                f'<td>{qv}</td><td class="pi">{qi}</td>'
+                f'<td class="{cc2(v25)}">{v25}</td></tr>')
+
+    body = ""
+    for gid, label, key, subs in grupos:
+        for sl, sk in subs:
+            if sk not in d_sel:
+                continue
+            body += fila2(sl, sk, gid=gid, sub=True)
+        body += fila2(label, key, gid=gid)
+
+    html = (f'<!DOCTYPE html><html><head><meta charset="utf-8"><style>{PL_CSS}'
+            f'.pi{{color:#9db3cc;font-size:11px}}</style></head>'
+            f'<body><table><thead><tr>'
+            f'<th>Concepto</th><th>PTO 2026</th><th>% Int</th>'
+            f'<th>Real 2T</th><th>% Int</th><th>vs PTO</th>'
+            f'<th>2025</th><th>% Int</th><th>vs 2025</th></tr></thead>'
+            f'<tbody>{body}</tbody></table><script>{PL_JS}</script></body></html>')
+    components.html(html, height=420, scrolling=False)
+

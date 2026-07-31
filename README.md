@@ -1,15 +1,17 @@
-# Town Hall 2026 — Ancora
+# Tablero Ejecutivo Ancora — Consejo (2T 2026)
 
-Tablero Streamlit de **ingresos y venta nueva por área** para el Town Hall 2026.
-Compara lo real de 2026 (año en curso) contra 2024, 2025 y el presupuesto anual.
+Tablero Streamlit del estado de resultados de Ancora al cierre del segundo
+trimestre 2026 (acumulado Ene–Jun), con identidad de marca.
 
-## Contenido
+> Nota: este repositorio se llama `tablero-townhall` por su origen; hoy sirve el
+> tablero del **Consejo** (se reemplazó el Town Hall reusando el mismo link).
+
+## Vistas
 
 | Página | Qué muestra |
 |---|---|
-| Panorama | Tarjetas por año (2024/2025/2026 con crecimiento), ingreso mensual comparado, mix por área y comparativo 2024 / 2025 / PTO 2026 / Real 2026 por área |
-| Ingreso Semestral | Crecimiento por línea de negocio (1er semestre), barras por área, Real 2026 vs Presupuesto y detalle mensual |
-| Venta Nueva | Acumulado vs años completos y presupuesto, por área |
+| Resumen | P&L 2T (PTO / Real / 2025 con % de integración), indicadores clave y EBITDA |
+| Por Línea de Negocio | Comparativo por LdN, combo Ingresos (barras) / Utilidad Operativa (línea) de los 3 periodos, mix, tabla resumen con rentabilidad, detalle mensual y P&L por línea |
 
 ## Correr en local
 
@@ -20,13 +22,12 @@ streamlit run streamlit_app.py
 
 ## Datos
 
-`EXCEL/Town Hall Julio 2026.xlsx` — hojas `Ingresos` y `VN`. Cada hoja apila
-bloques por año (2024, 2025, 2026 y PTO); el parser los localiza por el
-encabezado `AREA`, no por filas fijas. El bloque de 2026 solo trae los meses
-transcurridos (Ene–Jun).
+`EXCEL/Presentacion Consejo Junio 2026.xlsx` — hojas `General` (P&L 2T),
+`LdN` (7 bloques en dos columnas) e `Ingresos` (mensual por área). El archivo
+vive fuera de Google Drive a propósito: dentro de `Mi unidad` las fórmulas
+pierden su referencia externa y quedan en `#REF!`. La hoja `Utilidad x LdN`
+viene rota (`#REF!`) y no se usa.
 
-Notas del parseo:
+## Confidencial
 
-1. **El área `INTERNACIONAL` se excluye** de todo el tablero (`EXCLUIR_AREAS`).
-2. Las comparaciones de crecimiento de 2026 se hacen contra el **mismo periodo**
-   de 2025 (no contra el año completo), para que sean homogéneas.
+Contiene el P&L completo (utilidades, EBITDA, márgenes por línea de negocio).
