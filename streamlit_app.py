@@ -285,17 +285,9 @@ if pagina == "Resumen":
             st.metric(label, fmt_m(real),
                       delta=(f"Margen {pct(margen)}" if margen is not None else None),
                       delta_color="off")
-            g_col = "#51cf66"  # verde
-            avance_txt = (f" · avance <span style='color:{g_col}'>{avance*100:.1f}%</span>"
-                          if avance is not None else "")
-            d25_col = g_col if (d25 is not None and d25 >= 0) else "#ff6b6b"
-            d25_txt = (f"  <span style='color:{d25_col}'>({pct(d25)} vs 2025)</span>"
-                       if d25 is not None else "")
-            st.markdown(
-                f"<div style='font-size:1.1rem;color:#9db3cc;line-height:1.4'>"
-                f"PTO: {fmt_m(ptov)}{avance_txt}  |  2025: {fmt_m(y25)}{d25_txt}</div>",
-                unsafe_allow_html=True,
-            )
+            st.caption(f"PTO: {fmt_m(ptov)}"
+                       + (f" · avance {avance*100:.1f}%" if avance is not None else "")
+                       + f"  |  2025: {fmt_m(y25)}  ({pct(d25)} vs 2025)")
 
     st.divider()
     st.subheader("PTO vs Real vs 2025 — Indicadores clave")
