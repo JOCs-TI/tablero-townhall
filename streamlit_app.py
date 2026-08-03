@@ -76,8 +76,7 @@ def norm(s):
 
 # ── Carga ──────────────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner="Cargando datos...")
-def load_wb(sig):
-    # 'sig' = fecha de modificación del Excel; fuerza recarga cuando el archivo cambia.
+def load_wb():
     return openpyxl.load_workbook(EXCEL_PATH, data_only=True)
 
 # Conceptos del P&L (General y LdN comparten casi el mismo orden).
@@ -162,7 +161,7 @@ def parse_ingresos(wb):
     return result
 
 try:
-    wb = load_wb(EXCEL_PATH.stat().st_mtime)
+    wb = load_wb()
     GEN = parse_general(wb)
     LDN = parse_ldn(wb)
     ING = parse_ingresos(wb)
