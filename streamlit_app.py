@@ -595,13 +595,13 @@ if pagina == "Por Línea de Negocio":
             ("Bono", "Bono"), ("Bono", "Bonos"),
             ("Venta Nueva", "Venta Nueva")]),
         (None, "Costos de Referencia", "Costos de Referencia", []),
-        ("ub", "Utilidad Bruta", "Utilidad Bruta", [
-            ("Sueldos Directos", "Sueldos Directos"), ("Gastos Directos", "Gastos Directos")]),
+        (None, "Utilidad Bruta", "Utilidad Bruta", []),
         ("uo", "Utilidad Operativa", "Utilidad Operativa", [
+            ("Sueldos Directos", "Sueldos Directos"), ("Gastos Directos", "Gastos Directos")]),
+        ("eb", "EBITDA", "EBITDA", [
             ("Gastos Indirectos", "Gastos Indirectos"),
             ("Sueldos Corporativos", "Sueldos Corporativos"),
             ("Sueldos Compartidos", "Sueldos Compartidos")]),
-        (None, "EBITDA", "EBITDA", []),
     ]
 
     # Ingresos de la LdN (por columna) para el % de integración.
