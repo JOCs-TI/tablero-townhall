@@ -188,6 +188,10 @@ html, body, [data-testid="stAppViewContainer"], [data-testid="stSidebar"], .stAp
 [data-testid="stAppViewContainer"], [data-testid="stMarkdownContainer"],
 p, span:not([data-testid="stIconMaterial"]), label, td, th, li,
 div[data-testid="stMetricValue"], div[data-testid="stMetricDelta"] { font-weight: 500; }
+/* Texto del delta (verde) al mismo tamaño que el número blanco del valor. */
+div[data-testid="stMetricValue"] { font-size: 2rem !important; }
+div[data-testid="stMetricDelta"] { font-size: 2rem !important; line-height: 1.15 !important; }
+div[data-testid="stMetricDelta"] [data-testid="stIconMaterial"] { font-size: 2rem !important; }
 h1, h2, h3, h4, h5, h6, div[data-testid="stMetricLabel"] p { font-weight: 600 !important; }
 section[data-testid="stSidebar"] img { pointer-events: none; }
 section[data-testid="stSidebar"] [data-testid="StyledFullScreenButton"] { display: none; }
@@ -280,11 +284,13 @@ if pagina == "Resumen":
         real, ptov, y25 = g(key, "real_2q"), g(key, "pto_2q"), g(key, "y25_2q")
         d25 = (real / y25 - 1) if real and y25 else None
         margen = (real / ingreso_real) if (real and ingreso_real and key != "Ingresos") else None
+        avance = (real / ptov) if (real and ptov) else None
         with col:
             st.metric(label, fmt_m(real),
-                      delta=(f"Margen {pct(margen)}" if margen is not None else None),
-                      delta_color="off")
-            st.caption(f"PTO: {fmt_m(ptov)}  |  2025: {fmt_m(y25)}  ({pct(d25)} vs 2025)")
+                      delta=(f"Margen {pct(margen)}" if margen is not None else None))
+            st.caption(f"PTO: {fmt_m(ptov)}"
+                       + (f" · avance {avance*100:.1f}%" if avance is not None else "")
+                       + f"  |  2025: {fmt_m(y25)}  ({pct(d25)} vs 2025)")
 
     st.divider()
     st.subheader("PTO vs Real vs 2025 — Indicadores clave")
