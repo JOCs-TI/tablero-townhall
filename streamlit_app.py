@@ -312,6 +312,21 @@ if pagina == "Resumen":
             fig.add_annotation(x=lab, y=r / 2, text=pct(r / q - 1), showarrow=False,
                                font=dict(size=13, color="#ffffff"),
                                bgcolor="rgba(15,33,55,0.6)", borderpad=3)
+    # Sobre la barra amarilla (PTO): línea al nivel del Real = % de avance (Real/PTO).
+    _grp_w, _nbar = 0.8, 3
+    _bar_w = _grp_w / _nbar
+    _pto_off = -_grp_w / 2 + _bar_w / 2   # 1a barra del grupo (PTO), respecto al centro
+    for i, k in enumerate(keys):
+        p, r = g(k, "pto_2q"), g(k, "real_2q")
+        if p and r:
+            fig.add_shape(type="line", xref="x", yref="y",
+                          x0=i + _pto_off - _bar_w / 2, x1=i + _pto_off + _bar_w / 2,
+                          y0=r, y1=r, line=dict(color="#0f2137", width=3))
+            fig.add_annotation(x=i + _pto_off, y=r, xref="x", yref="y",
+                               text=f"avance {r / p * 100:.1f}%", showarrow=False,
+                               yanchor="bottom", yshift=3,
+                               font=dict(size=10, color="#0f2137"),
+                               bgcolor="rgba(255,255,255,0.8)", borderpad=2)
     fig.update_layout(barmode="group", yaxis_tickformat="$,.0f",
                       legend=dict(orientation="h", y=1.12),
                       uniformtext=dict(minsize=7, mode="hide"),
