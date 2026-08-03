@@ -546,9 +546,9 @@ if pagina == "Por Línea de Negocio":
                 row[f"{lab} % Int"] = f"{val/totales[c]*100:.1f}%" if totales[c] else "—"
                 # vs PTO solo aplica al Real 2026 (no se compara 2025 ni el PTO contra sí mismo).
                 row[f"{lab} vs PTO"] = pct((val / ptov - 1) if ptov else None) if field == "real" else "—"
-            # Rentabilidad = Utilidad Operativa ÷ Ingresos de esa línea.
+            # Rentabilidad = EBITDA ÷ Ingresos de esa línea (margen EBITDA).
             ing_l = lv(l, "Ingresos", field)
-            row["Rentabilidad"] = f"{lv(l, 'Utilidad Operativa', field)/ing_l*100:.1f}%" if ing_l else "—"
+            row["Rentabilidad"] = f"{lv(l, 'EBITDA', field)/ing_l*100:.1f}%" if ing_l else "—"
             rows.append(row)
         # LdN como índice: st.dataframe la deja fija al hacer scroll horizontal.
         st.dataframe(pd.DataFrame(rows).set_index("LdN"), use_container_width=True)
