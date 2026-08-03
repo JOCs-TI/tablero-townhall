@@ -410,13 +410,15 @@ if pagina == "Por Línea de Negocio":
         return LDN.get(ldn, {}).get(concepto, {}).get(campo) or 0
 
     total_ing = sum(lv(l, "Ingresos", "real") for l in LDN_LIST)
+    # Orden descendente por ingreso real (2T).
+    ldn_orden = sorted(LDN_LIST, key=lambda l: -lv(l, "Ingresos", "real"))
     # Carrusel: 3 tarjetas a la vez, con flechas para ver las demas.
     PER_PAGE = 3
-    total_pages = -(-len(LDN_LIST) // PER_PAGE)  # division techo
+    total_pages = -(-len(ldn_orden) // PER_PAGE)  # division techo
     if "ldn_page" not in st.session_state:
         st.session_state.ldn_page = 0
     page = max(0, min(st.session_state.ldn_page, total_pages - 1))
-    fila = LDN_LIST[page * PER_PAGE:(page + 1) * PER_PAGE]
+    fila = ldn_orden[page * PER_PAGE:(page + 1) * PER_PAGE]
 
     cols = st.columns(3)
     for col, l in zip(cols, fila):
