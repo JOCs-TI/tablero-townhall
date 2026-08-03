@@ -521,20 +521,24 @@ if pagina == "Por Línea de Negocio":
         st.plotly_chart(fig_p, use_container_width=True)
     with ct:
         st.subheader(f"Tabla resumen por LdN · {year_sel}")
-        conceptos = ["Ingresos", "Utilidad Bruta", "Utilidad Operativa"]
+        # (clave en los datos, etiqueta a mostrar). EBITDA vive como "Utilidad".
+        conceptos = [("Ingresos", "Ingresos"),
+                     ("Utilidad Bruta", "Utilidad Bruta"),
+                     ("Utilidad Operativa", "Utilidad Operativa"),
+                     ("Utilidad", "EBITDA")]
         # Total por concepto (del año seleccionado) para el % de integración.
-        totales = {c: sum(lv(l, c, field) for l in LDN_LIST) for c in conceptos}
+        totales = {c: sum(lv(l, c, field) for l in LDN_LIST) for c, _ in conceptos}
         rows = []
         for l in LDN_LIST:
             row = {"LdN": l}
-            for c in conceptos:
+            for c, lab in conceptos:
                 val = lv(l, c, field)
                 ptov = lv(l, c, "pto")
-                row[c] = fmt(val)
+                row[lab] = fmt(val)
                 # % de integración: cuánto representa esta LdN del total del concepto.
-                row[f"{c} % Int"] = f"{val/totales[c]*100:.1f}%" if totales[c] else "—"
+                row[f"{lab} % Int"] = f"{val/totales[c]*100:.1f}%" if totales[c] else "—"
                 # vs PTO solo aplica al Real 2026 (no se compara 2025 ni el PTO contra sí mismo).
-                row[f"{c} vs PTO"] = pct((val / ptov - 1) if ptov else None) if field == "real" else "—"
+                row[f"{lab} vs PTO"] = pct((val / ptov - 1) if ptov else None) if field == "real" else "—"
             # Rentabilidad = Utilidad Operativa ÷ Ingresos de esa línea.
             ing_l = lv(l, "Ingresos", field)
             row["Rentabilidad"] = f"{lv(l, 'Utilidad Operativa', field)/ing_l*100:.1f}%" if ing_l else "—"
