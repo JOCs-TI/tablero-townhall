@@ -532,7 +532,7 @@ if pagina == "Por Línea de Negocio":
         conceptos = [("Ingresos", "Ingresos"),
                      ("Utilidad Bruta", "Utilidad Bruta"),
                      ("Utilidad Operativa", "Utilidad Operativa"),
-                     ("Utilidad", "EBITDA")]
+                     ("EBITDA", "EBITDA")]
         # Total por concepto (del año seleccionado) para el % de integración.
         totales = {c: sum(lv(l, c, field) for l in LDN_LIST) for c, _ in conceptos}
         rows = []
@@ -592,11 +592,11 @@ if pagina == "Por Línea de Negocio":
         (None, "Costos de Referencia", "Costos de Referencia", []),
         ("ub", "Utilidad Bruta", "Utilidad Bruta", [
             ("Sueldos Directos", "Sueldos Directos"), ("Gastos Directos", "Gastos Directos")]),
-        ("ud", "Utilidad Directa", "Utilidad Directa", [
+        ("uo", "Utilidad Operativa", "Utilidad Operativa", [
             ("Gastos Indirectos", "Gastos Indirectos"),
             ("Sueldos Corporativos", "Sueldos Corporativos"),
             ("Sueldos Compartidos", "Sueldos Compartidos")]),
-        (None, "Utilidad Operativa", "Utilidad Operativa", []),
+        (None, "EBITDA", "EBITDA", []),
     ]
 
     # Ingresos de la LdN (por columna) para el % de integración.
