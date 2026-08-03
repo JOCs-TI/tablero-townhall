@@ -554,7 +554,12 @@ if pagina == "Por Línea de Negocio":
             row["Rentabilidad"] = f"{lv(l, 'EBITDA', field)/ing_l*100:.1f}%" if ing_l else "—"
             rows.append(row)
         # LdN como índice: st.dataframe la deja fija al hacer scroll horizontal.
-        st.dataframe(pd.DataFrame(rows).set_index("LdN"), use_container_width=True)
+        df_ldn = pd.DataFrame(rows).set_index("LdN")
+        int_cols = [c for c in df_ldn.columns if c.endswith("% Int")]
+        sty = df_ldn.style.set_properties(
+            subset=int_cols,
+            **{"background-color": "rgba(31,119,180,0.30)", "color": "#dbeeff"})
+        st.dataframe(sty, use_container_width=True)
 
     st.divider()
     st.subheader("Detalle mensual")
