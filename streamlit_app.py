@@ -336,17 +336,20 @@ if pagina == "Resumen":
     st.divider()
     st.subheader("Estado de Resultados · Acumulado 2T 2026")
 
+    # Estructura idéntica al Excel (hoja General, filas 4–16), hasta EBITDA:
+    # Base/Bono/VN → Ingresos → Costos → Utilidad Bruta → Sueldos/Gastos Dir →
+    # Utilidad Operativa → Gastos Ind/Sueldos Corp/Comp → EBITDA.
     grupos = [
         ("ing", "Ingresos Totales", "Ingresos", [
             ("Base Line", BASE_KEY), ("Bono", "Bono"), ("Venta Nueva", "Venta Nueva")]),
         (None, "Costos de Referencia", "Costos de Referencia", []),
-        ("ub", "Utilidad Bruta", "Utilidad Bruta", [
-            ("Sueldos Directos", "Sueldos Directos"), ("Gastos Directos", "Gastos Directos")]),
+        (None, "Utilidad Bruta", "Utilidad Bruta", []),
         ("uo", "Utilidad Operativa", "Utilidad Operativa", [
+            ("Sueldos Directos", "Sueldos Directos"), ("Gastos Directos", "Gastos Directos")]),
+        ("eb", "EBITDA", "Utilidad", [
             ("Gastos Indirectos", "Gastos Indirectos"),
             ("Sueldos Corporativos", "Sueldos Corporativos"),
             ("Sueldos Compartidos", "Sueldos Compartidos")]),
-        (None, "EBITDA", "Utilidad", []),
     ]
 
     # Ingresos de referencia (por columna) para el % de integración.
