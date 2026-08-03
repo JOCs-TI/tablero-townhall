@@ -491,12 +491,19 @@ if pagina == "Por Línea de Negocio":
         fig.add_bar(name=etq, x=LDN_LIST,
                     y=[lv(l, "Ingresos", fld) for l in LDN_LIST], marker_color=color)
     # Colores de línea distintos a los de las barras para que contrasten.
-    for etq, fld, color, dash, w in [("U.Op 2025", "y25", "#aab7c4", "dot", 2),
-                                     ("U.Op Real 2026", "real", "#ff7a5c", None, 4),
-                                     ("U.Op PTO", "pto", "#f2f2f2", "dash", 2.5)]:
+    for etq, fld, color, dash, w, tpos in [
+            ("U.Op 2025", "y25", "#aab7c4", "dot", 2, "bottom center"),
+            ("U.Op Real 2026", "real", "#ff7a5c", None, 4, "top center"),
+            ("U.Op PTO", "pto", "#f2f2f2", "dash", 2.5, "top center")]:
+        # En cada punto: % de rentabilidad = Utilidad Operativa / Ingresos de esa LdN.
+        rent_txt = [f"{lv(l, 'Utilidad Operativa', fld) / lv(l, 'Ingresos', fld) * 100:.1f}%"
+                    if lv(l, "Ingresos", fld) else "" for l in LDN_LIST]
         fig.add_scatter(name=etq, x=LDN_LIST,
                         y=[lv(l, "Utilidad Operativa", fld) for l in LDN_LIST],
-                        mode="lines+markers", line=dict(color=color, width=w, dash=dash),
+                        mode="lines+markers+text",
+                        text=rent_txt, textposition=tpos,
+                        textfont=dict(size=9, color=color),
+                        line=dict(color=color, width=w, dash=dash),
                         marker=dict(size=7, line=dict(width=1, color="#0f2137")))
     fig.update_layout(barmode="group", height=520, margin=dict(t=50, b=10),
                       legend=dict(orientation="h", y=1.14),
