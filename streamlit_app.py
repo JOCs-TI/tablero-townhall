@@ -327,7 +327,7 @@ if pagina == "Resumen":
                                yanchor="bottom", yshift=3,
                                font=dict(size=10, color="#0f2137"),
                                bgcolor="rgba(255,255,255,0.8)", borderpad=2)
-    fig.update_layout(barmode="group", yaxis_tickformat="$,.0f",
+    fig.update_layout(dragmode="pan", barmode="group", yaxis_tickformat="$,.0f",
                       legend=dict(orientation="h", y=1.12),
                       uniformtext=dict(minsize=7, mode="hide"),
                       height=500, margin=dict(t=80, b=20))
@@ -479,7 +479,7 @@ if pagina == "Por Línea de Negocio":
     fig_sem.add_bar(name="PTO 2026", x=ao, y=[pp.get(a, 0) for a in ao],
                     marker_color=COLOR_PTO, text=avance, textposition="outside",
                     textfont=dict(size=10, color="#e0e0e0"), cliponaxis=False)
-    fig_sem.update_layout(barmode="group", yaxis_tickformat="$,.0f", height=470,
+    fig_sem.update_layout(dragmode="pan", barmode="group", yaxis_tickformat="$,.0f", height=470,
                           margin=dict(t=50, b=20), legend=dict(orientation="h", y=1.1))
     st.plotly_chart(fig_sem, use_container_width=True)
 
@@ -508,7 +508,7 @@ if pagina == "Por Línea de Negocio":
                         textfont=dict(size=9, color=color),
                         line=dict(color=color, width=w, dash=dash),
                         marker=dict(size=7, line=dict(width=1, color="#0f2137")))
-    fig.update_layout(barmode="group", height=520, margin=dict(t=50, b=10),
+    fig.update_layout(dragmode="pan", barmode="group", height=520, margin=dict(t=50, b=10),
                       legend=dict(orientation="h", y=1.14),
                       yaxis=dict(title="MXN", tickformat="$,.0f"))
     st.plotly_chart(fig, use_container_width=True)
