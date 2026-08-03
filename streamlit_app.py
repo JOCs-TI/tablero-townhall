@@ -587,7 +587,9 @@ if pagina == "Por Línea de Negocio":
     d_sel = LDN.get(sel, {})
     grupos = [
         ("ing", "Ingresos", "Ingresos", [
-            ("Base Line", "Base Line"), ("Bono", "Bono "), ("Bono", "Bonos"),
+            ("Base Line", "Base Line"),
+            # El rubro Bono aparece como "Bono" en unas LdN y "Bonos" en otras.
+            ("Bono", "Bono"), ("Bono", "Bonos"),
             ("Venta Nueva", "Venta Nueva")]),
         (None, "Costos de Referencia", "Costos de Referencia", []),
         ("ub", "Utilidad Bruta", "Utilidad Bruta", [
