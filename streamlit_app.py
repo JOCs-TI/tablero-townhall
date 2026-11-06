@@ -175,10 +175,20 @@ if not ING:
     st.error("No se encontraron bloques de datos en el Sheet de Town Hall.")
     st.stop()
 
-# Áreas excluidas de todo el tablero.
-EXCLUIR_AREAS = {"INTERNACIONAL", "ANI"}
+# ANI se excluye del tablero. INTERNACIONAL ya no se excluye -- se fusiona
+# dentro de DAÑOS (confirmado con el usuario, 2026-11-06: "excluye ani y
+# internacional sumalo a danos").
+EXCLUIR_AREAS = {"ANI"}
+FUSIONAR_EN = {"INTERNACIONAL": "DAÑOS"}
 for _grupo in (ING, VN):
     for _bloque in _grupo.values():
+        for _origen, _destino in FUSIONAR_EN.items():
+            if _origen in _bloque:
+                _valores = _bloque.pop(_origen)
+                if _destino in _bloque:
+                    _bloque[_destino] = [a + b for a, b in zip(_bloque[_destino], _valores)]
+                else:
+                    _bloque[_destino] = _valores
         for _a in list(_bloque):
             if _a in EXCLUIR_AREAS:
                 del _bloque[_a]
