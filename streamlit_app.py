@@ -531,19 +531,24 @@ if pagina == "Panorama":
 # INGRESOS MENSUAL
 # ══════════════════════════════════════════════════════════════════════════════
 if pagina == "Ingreso Semestral":
-    SEM = 6
+    # El periodo de comparacion sigue el ultimo mes con datos reales de 2026
+    # (N_MES, dinamico) en vez de un primer semestre fijo -- a pedido del
+    # usuario (2026-11-06), para que 2024/2025/2026 se comparen contra el
+    # mismo tramo del año (hoy Ene-Sep, 3er trimestre) y no se quede
+    # desactualizado cuando avance el año.
+    SEM = N_MES
     def h1(bl, a):
         return sum(bl.get(a, [0] * 12)[:SEM])
 
     # (etiqueta, bloque, color, bloque del año anterior para el % de crecimiento)
-    series = [("1er sem 2024", B24, COLOR_2024, None),
-              ("1er sem 2025", B25, COLOR_2025, B24),
-              ("1er sem 2026", B26, COLOR_2026, B25)]
+    series = [(f"{PERIODO} 2024", B24, COLOR_2024, None),
+              (f"{PERIODO} 2025", B25, COLOR_2025, B24),
+              (f"{PERIODO} 2026", B26, COLOR_2026, B25)]
     areas_sem = [a for a in AREAS
                  if any(h1(bl, a) > 0 for _, bl, _, _ in series)]
 
     # ── Carrusel de crecimiento por línea de negocio (de 2 en 2) ────────────────
-    st.subheader("Crecimiento por línea de negocio · 1er semestre")
+    st.subheader(f"Crecimiento por línea de negocio · {PERIODO}")
     PASO = 2
     n = len(areas_sem)
     total_pag = max(1, (n + PASO - 1) // PASO)
@@ -575,7 +580,7 @@ if pagina == "Ingreso Semestral":
                       delta=pct(s26 / s25 - 1) if s25 > 0 else None)
 
     st.divider()
-    st.subheader("Ingreso por área · primer semestre por año")
+    st.subheader(f"Ingreso por área · {PERIODO} por año")
     orden_sem = [s[0] for s in series]
     colores_sem = [s[2] for s in series]
     filas_sem = []
