@@ -354,7 +354,7 @@ with st.sidebar:
     st.caption("TABLEROS")
     pagina = st.radio(
         "",
-        ["Panorama", "Ingreso Semestral", "Venta Nueva"],
+        ["Panorama", "Ingreso Acumulado", "Venta Nueva"],
         label_visibility="collapsed",
         key="nav",
     )
@@ -530,7 +530,7 @@ if pagina == "Panorama":
 # ══════════════════════════════════════════════════════════════════════════════
 # INGRESOS MENSUAL
 # ══════════════════════════════════════════════════════════════════════════════
-if pagina == "Ingreso Semestral":
+if pagina == "Ingreso Acumulado":
     # El periodo de comparacion sigue el ultimo mes con datos reales de 2026
     # (N_MES, dinamico) en vez de un primer semestre fijo -- a pedido del
     # usuario (2026-11-06), para que 2024/2025/2026 se comparen contra el
