@@ -25,9 +25,12 @@ streamlit run streamlit_app.py
 
 ## Datos
 
-`EXCEL/Town Hall Julio 2026.xlsx`. El archivo vive fuera de Google Drive a
-propósito: dentro de `Mi unidad` las fórmulas pierden su referencia externa
-y quedan en `#REF!`.
+Google Sheet en vivo (`TOWNHALL_SHEET_ID`), descargado con
+`export?format=xlsx` sin API key (mismo patrón que Facturación/Tarjetas de
+Crédito). Se cachea 5 minutos (`@st.cache_data(ttl=300)`). Hojas `Ingresos`
+y `VN`, cada una con 4 bloques apilados por año (2024, 2025, 2026 Real,
+PTO 2026) — ver detalle en memoria del proyecto
+(`town-hall-bloques-por-año`).
 
 ## Confidencial
 

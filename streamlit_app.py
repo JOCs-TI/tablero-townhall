@@ -1,6 +1,8 @@
+from io import BytesIO
 import altair as alt
 import openpyxl
 import pandas as pd
+import requests
 import streamlit as st
 import streamlit.components.v1 as components
 from pathlib import Path
@@ -13,10 +15,14 @@ st.set_page_config(
 )
 
 BASE = Path(__file__).parent
-
-EXCEL_PATH = BASE / "EXCEL" / "Town Hall Julio 2026.xlsx"
 # Logo en negativo (marcas off-white, fondo transparente) para el sidebar navy.
 LOGO_PATH = BASE / "imagenes" / "ancora_blanco.png"
+
+# Fuente de datos: Google Sheet en vivo (ya no el Excel local -- a pedido
+# del usuario, 2026-11-06: "ya no vamos a usar el excel como fuente, solo
+# usemos el sheets"). Mismo patron sin API key que Facturacion/Tarjetas de
+# Credito (export?format=xlsx, hoja compartida "cualquiera con el link").
+TOWNHALL_SHEET_ID = "1hKrCVzzBZHIKOvlCdriTPHgdC36bXIxJb4osUhZVYE4"
 
 MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
          "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
@@ -108,10 +114,13 @@ def estilizar(chart):
 EJE_DOLAR = alt.Axis(labelExpr="'$' + format(datum.value, ',.0f')")
 
 # ── Carga ──────────────────────────────────────────────────────────────────────
-@st.cache_data(show_spinner="Cargando datos...")
+@st.cache_data(ttl=300, show_spinner="Cargando datos...")
 def load_data():
     """Lee los bloques por año buscando los encabezados 'AREA', no filas fijas."""
-    wb = openpyxl.load_workbook(EXCEL_PATH, data_only=True)
+    url = f"https://docs.google.com/spreadsheets/d/{TOWNHALL_SHEET_ID}/export?format=xlsx"
+    resp = requests.get(url, timeout=30)
+    resp.raise_for_status()
+    wb = openpyxl.load_workbook(BytesIO(resp.content), data_only=True)
 
     def etiqueta(txt):
         s = str(txt).upper()
@@ -159,11 +168,11 @@ def load_data():
 try:
     ING, VN = load_data()
 except Exception as e:
-    st.error(f"Error al abrir el archivo: {e}")
+    st.error(f"Error al descargar/leer los datos del Sheet:\n\n{e}")
     st.stop()
 
 if not ING:
-    st.error(f"No se encontraron bloques de datos en el archivo:\n\n`{EXCEL_PATH}`")
+    st.error("No se encontraron bloques de datos en el Sheet de Town Hall.")
     st.stop()
 
 # Áreas excluidas de todo el tablero.
