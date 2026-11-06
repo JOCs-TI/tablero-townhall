@@ -1,17 +1,20 @@
-# Tablero Ejecutivo Ancora — Consejo (2T 2026)
+# Town Hall 2026 — Ancora
 
-Tablero Streamlit del estado de resultados de Ancora al cierre del segundo
-trimestre 2026 (acumulado Ene–Jun), con identidad de marca.
+Tablero Streamlit de ingresos y venta nueva por área, con identidad de marca.
 
-> Nota: este repositorio se llama `tablero-townhall` por su origen; hoy sirve el
-> tablero del **Consejo** (se reemplazó el Town Hall reusando el mismo link).
+> Nota: este repositorio se llama `tablero-townhall` por su origen. Entre
+> agosto y noviembre de 2026 sirvió temporalmente el tablero del **Consejo**
+> reusando el mismo link; volvió a servir Town Hall el 2026-11-06.
 
 ## Vistas
 
 | Página | Qué muestra |
 |---|---|
-| Resumen | P&L 2T (PTO / Real / 2025 con % de integración), indicadores clave y EBITDA |
-| Por Línea de Negocio | Comparativo por LdN, combo Ingresos (barras) / Utilidad Operativa (línea) de los 3 periodos, mix, tabla resumen con rentabilidad, detalle mensual y P&L por línea |
+| Panorama | KPIs globales, comparativo 2024/2025/PTO/Real y proyección de cierre de año |
+| Ingreso Semestral | Ingreso mensual por área |
+| Venta Nueva | Venta nueva por área |
+
+Excluye las áreas `INTERNACIONAL` y `ANI` (`EXCLUIR_AREAS`).
 
 ## Correr en local
 
@@ -22,12 +25,10 @@ streamlit run streamlit_app.py
 
 ## Datos
 
-`EXCEL/Presentacion Consejo Junio 2026.xlsx` — hojas `General` (P&L 2T),
-`LdN` (7 bloques en dos columnas) e `Ingresos` (mensual por área). El archivo
-vive fuera de Google Drive a propósito: dentro de `Mi unidad` las fórmulas
-pierden su referencia externa y quedan en `#REF!`. La hoja `Utilidad x LdN`
-viene rota (`#REF!`) y no se usa.
+`EXCEL/Town Hall Julio 2026.xlsx`. El archivo vive fuera de Google Drive a
+propósito: dentro de `Mi unidad` las fórmulas pierden su referencia externa
+y quedan en `#REF!`.
 
 ## Confidencial
 
-Contiene el P&L completo (utilidades, EBITDA, márgenes por línea de negocio).
+Contiene ingreso y venta nueva por área. Uso interno.
