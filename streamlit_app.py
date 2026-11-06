@@ -466,6 +466,13 @@ if pagina == "Panorama":
         g = nuevo / viejo - 1
         return f" · {'+' if g >= 0 else ''}{g*100:.0f}% {suf}"
 
+    def _crece_pct(nuevo, viejo):
+        """Solo el porcentaje (sin el sufijo 'vs X'), para la etiqueta corta junto a la barra."""
+        if not viejo:
+            return ""
+        g = nuevo / viejo - 1
+        return f"{'+' if g >= 0 else ''}{g*100:.0f}%"
+
     def _texto_real(a):
         """Monto real + crecimiento vs 2025 (mismo periodo) + % que falta al PTO."""
         real, pto = areal.get(a, 0), apto.get(a, 0)
@@ -490,19 +497,22 @@ if pagina == "Panorama":
             v = d.get(a, 0)
             if es_real:
                 txt = _texto_real(a)
+                pct = _crece_pct(v, a25_ytd.get(a, 0))
             elif ref is not None:
                 txt = fmt_m(v) + _crece(v, ref.get(a, 0), suf)
+                pct = _crece_pct(v, ref.get(a, 0))
             else:  # 2024 es la base, sin crecimiento
                 txt = fmt_m(v)
+                pct = ""
             filas_cmp.append({"Área": a, "Serie": etq, "Valor": v,
-                              "ValorMedio": v / 2, "Texto": txt, "EsReal": es_real})
+                              "ValorMedio": v / 2, "Texto": txt, "Crecimiento": pct, "EsReal": es_real})
     df_cmp = pd.DataFrame(filas_cmp)
     max_cmp = df_cmp["Valor"].max() or 1
 
     base_cmp = alt.Chart(df_cmp).encode(
         y=alt.Y("Área:N", sort=areas_y, title=None),
         yOffset=alt.YOffset("Serie:N", sort=orden_cmp),
-        x=alt.X("Valor:Q", title=None, scale=alt.Scale(domain=[0, max_cmp * 1.1]),
+        x=alt.X("Valor:Q", title=None, scale=alt.Scale(domain=[0, max_cmp * 1.18]),
                 axis=EJE_DOLAR),
         color=alt.Color("Serie:N", sort=orden_cmp,
                          scale=alt.Scale(domain=orden_cmp, range=colores_cmp),
@@ -511,7 +521,10 @@ if pagina == "Panorama":
                  alt.Tooltip("Texto:N", title="Detalle")],
     )
     barras_cmp = base_cmp.mark_bar(cornerRadiusEnd=2)
-    chart_cmp = barras_cmp.properties(height=760)
+    etiqueta_crec = base_cmp.transform_filter(alt.datum.Crecimiento != "").mark_text(
+        align="left", baseline="middle", fontSize=9, dx=4,
+    ).encode(x=alt.X("Valor:Q"), text="Crecimiento:N", color=alt.value("#9fb3c8"))
+    chart_cmp = (barras_cmp + etiqueta_crec).properties(height=760)
     st.altair_chart(estilizar(chart_cmp), use_container_width=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
