@@ -466,12 +466,12 @@ if pagina == "Panorama":
         g = nuevo / viejo - 1
         return f" · {'+' if g >= 0 else ''}{g*100:.0f}% {suf}"
 
-    def _crece_pct(nuevo, viejo):
-        """Solo el porcentaje (sin el sufijo 'vs X'), para la etiqueta corta junto a la barra."""
+    def _crece_pct(nuevo, viejo, suf):
+        """Porcentaje + contra qué se compara (ej. '+14% vs 24'), para la etiqueta corta junto a la barra."""
         if not viejo:
             return ""
         g = nuevo / viejo - 1
-        return f"{'+' if g >= 0 else ''}{g*100:.0f}%"
+        return f"{'+' if g >= 0 else ''}{g*100:.0f}% {suf}"
 
     def _texto_real(a):
         """Monto real + crecimiento vs 2025 (mismo periodo) + % que falta al PTO."""
@@ -497,10 +497,10 @@ if pagina == "Panorama":
             v = d.get(a, 0)
             if es_real:
                 txt = _texto_real(a)
-                pct = _crece_pct(v, a25_ytd.get(a, 0))
+                pct = _crece_pct(v, a25_ytd.get(a, 0), "vs 25")
             elif ref is not None:
                 txt = fmt_m(v) + _crece(v, ref.get(a, 0), suf)
-                pct = _crece_pct(v, ref.get(a, 0))
+                pct = _crece_pct(v, ref.get(a, 0), suf)
             else:  # 2024 es la base, sin crecimiento
                 txt = fmt_m(v)
                 pct = ""
@@ -512,7 +512,7 @@ if pagina == "Panorama":
     base_cmp = alt.Chart(df_cmp).encode(
         y=alt.Y("Área:N", sort=areas_y, title=None),
         yOffset=alt.YOffset("Serie:N", sort=orden_cmp),
-        x=alt.X("Valor:Q", title=None, scale=alt.Scale(domain=[0, max_cmp * 1.18]),
+        x=alt.X("Valor:Q", title=None, scale=alt.Scale(domain=[0, max_cmp * 1.25]),
                 axis=EJE_DOLAR),
         color=alt.Color("Serie:N", sort=orden_cmp,
                          scale=alt.Scale(domain=orden_cmp, range=colores_cmp),
