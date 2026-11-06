@@ -487,14 +487,12 @@ if pagina == "Panorama":
             filas_cmp.append({"Área": a, "Serie": etq, "Valor": v,
                               "ValorMedio": v / 2, "Texto": txt, "EsReal": es_real})
     df_cmp = pd.DataFrame(filas_cmp)
-    # Dominio con margen extra a la derecha para que la etiqueta "por fuera" del
-    # Real (puede incluir "· falta NN% PTO") no se corte contra el borde del chart.
     max_cmp = df_cmp["Valor"].max() or 1
 
     base_cmp = alt.Chart(df_cmp).encode(
         y=alt.Y("Área:N", sort=areas_y, title=None),
         yOffset=alt.YOffset("Serie:N", sort=orden_cmp),
-        x=alt.X("Valor:Q", title=None, scale=alt.Scale(domain=[0, max_cmp * 1.6]),
+        x=alt.X("Valor:Q", title=None, scale=alt.Scale(domain=[0, max_cmp * 1.1]),
                 axis=EJE_DOLAR),
         color=alt.Color("Serie:N", sort=orden_cmp,
                          scale=alt.Scale(domain=orden_cmp, range=colores_cmp),
@@ -503,13 +501,7 @@ if pagina == "Panorama":
                  alt.Tooltip("Texto:N", title="Detalle")],
     )
     barras_cmp = base_cmp.mark_bar(cornerRadiusEnd=2)
-    texto_dentro = base_cmp.transform_filter(~alt.datum.EsReal).mark_text(
-        align="center", baseline="middle", fontSize=10,
-    ).encode(x=alt.X("ValorMedio:Q"), text="Texto:N", color=alt.value("#111111"))
-    texto_fuera = base_cmp.transform_filter(alt.datum.EsReal).mark_text(
-        align="left", baseline="middle", fontSize=10, dx=6,
-    ).encode(x=alt.X("Valor:Q"), text="Texto:N", color=alt.value("#e8e8e8"))
-    chart_cmp = (barras_cmp + texto_dentro + texto_fuera).properties(height=760)
+    chart_cmp = barras_cmp.properties(height=760)
     st.altair_chart(estilizar(chart_cmp), use_container_width=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
